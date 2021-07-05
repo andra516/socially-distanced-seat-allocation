@@ -2,11 +2,13 @@
 """
 Created on Mon Jun 28 16:17:23 2021
 
+### MASTER BRANCH
+
 @author: henry
 """
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt, QRect, QRectF, QObject, pyqtSignal, pyqtSlot
-from PyQt5.QtGui import QPixmap, QBitmap, QIcon, QPen, QColor, QKeySequence, QCursor
+from PyQt5.QtGui import QPixmap, QBitmap, QIcon, QPen, QBrush, QColor, QKeySequence, QCursor
 import sys
 import os
 #import time
@@ -319,7 +321,8 @@ class MyMainWindow(QtWidgets.QMainWindow):
         
     @pyqtSlot(int)
     def highlightMove(self, index):
-        pass        
+        highlightedGraphicsEllipseItem = self.currentGraphicsEllipseItems[index]
+        highlightedGraphicsEllipseItem.setBrush(QBrush(QColor()))
 
     def saveSeats(self):
         self.seatPixelCoords = np.zeros((len(self.currentGraphicsEllipseItems), 2))
