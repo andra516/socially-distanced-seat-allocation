@@ -16,7 +16,7 @@ from seatAllocationAlgorithmJon import jonsAllocator
 class Communication(QObject):
     
     ginputClickSignal = pyqtSignal(float, float) # will be used to tell MainWindow where seat positions are.
-
+    moveClickSignal = pyqtSignal(int)
 
 class MyGraphicsView(QtWidgets.QGraphicsView):
     
@@ -28,16 +28,49 @@ class MyGraphicsView(QtWidgets.QGraphicsView):
         
         self.communicator = Communication()
         self.communicator.ginputClickSignal.connect(parent.recordCoord)
+        self.communicator.moveClickSignal.connect(parent.highlightMove)
     
     def mousePressEvent(self, event):
         print('mouse press event local pos', event.localPos().toPoint())
-        if self.parent.ginputPermission == True:
-            scenePressPoint = self.mapToScene(event.localPos().toPoint()) # this is a QPointF
-            x = scenePressPoint.x()
-            y = scenePressPoint.y()
-            self.communicator.ginputClickSignal.emit(x, y)
+        if self.parent.ginputPermission:
+            self.handleGinput(event)
+            
+        elif self.parent.movePermission:
+            self.handleMove(event)
         else:
             pass
+        
+    def handleGinput(self, event):
+        scenePressPoint = self.mapToScene(event.localPos().toPoint()) # this is a QPointF
+        x = scenePressPoint.x()
+        y = scenePressPoint.y()
+        self.communicator.ginputClickSignal.emit(x, y)
+        
+    def handleMove(self, event):
+        seatPixelPositions = np.zeros((len(self.parent.Xs), 2))
+        seatPixelPositions[:,0] = self.parent.Xs
+        seatPixelPositions[:,1] = self.parent.Ys
+        
+#        print(seatPixelPositions)
+        scenePressPoint = self.mapToScene(event.localPos().toPoint())
+        
+        clickPixelPosition = np.zeros(seatPixelPositions.shape)
+        clickPixelPosition[:,0] = scenePressPoint.x()
+        clickPixelPosition[:,1] = scenePressPoint.y()
+#        print(clickPixelPosition)
+        
+        pixelDistArray = abs(seatPixelPositions**2 - clickPixelPosition**2).sum(axis=1)
+        print(pixelDistArray)
+        index = np.argwhere(pixelDistArray < self.parent.circleRadius**2)[0][0]
+        ## returns the index of QGraphicsItem where click was inside the radius
+        
+        
+        self.communicator.moveClickSignal.emit(index)
+        
+        
+        
+        
+        
 
 class MyMainWindow(QtWidgets.QMainWindow):
     
@@ -47,8 +80,6 @@ class MyMainWindow(QtWidgets.QMainWindow):
 #        self.resize(1500, 800)
         self.setGeometry(200, 100, 1200, 700)
         self.show()
-        print('why son')
-        print('wow thats grape')
         
         self.setUpUi()
         
@@ -82,6 +113,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.selectSeatsAct = QtWidgets.QAction('Enable ginput to select seats')
         self.undoSelectAct = QtWidgets.QAction('Undo last selection')
         self.movePointAct = QtWidgets.QAction('Move selections')
+        self.movePermission = False
         self.clearAllAct = QtWidgets.QAction('Clear all selections')
         self.doneAndRunAct = QtWidgets.QAction('Done and run allocator')
         ### initially all disabled
@@ -94,6 +126,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.selectSeatsAct.triggered.connect(self.ginput)
         self.undoSelectAct.triggered.connect(self.undoSelection)
         self.clearAllAct.triggered.connect(self.clearSelections)
+        self.movePointAct.triggered.connect(self.movePoint)
         self.doneAndRunAct.triggered.connect(self.saveSeats)
         
         self.undoSelectAct.setShortcut(QKeySequence('Ctrl+Z'))
@@ -116,11 +149,11 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.toolbarLayout = QtWidgets.QHBoxLayout()
         self.toolbar = QtWidgets.QToolBar()
         self.toolbar.setOrientation(Qt.Horizontal)
-        self.zoomInAct = QtWidgets.QAction(QIcon(os.getcwd() + '\\icon logos\\zoomIn.png'), 'Zoom In')
-        self.zoomOutAct = QtWidgets.QAction(QIcon(os.getcwd() + '\\icon logos\\zoomOut.png'), 'Zoom Out')
-        self.ginputAct = QtWidgets.QAction(QIcon(os.getcwd() + '\\icon logos\\ginput.png'),'Ginput')
+        self.zoomInAct = QtWidgets.QAction(QIcon(os.getcwd() + '\\images and icons\\zoomIn.png'), 'Zoom In')
+        self.zoomOutAct = QtWidgets.QAction(QIcon(os.getcwd() + '\\images and icons\\zoomOut.png'), 'Zoom Out')
+        self.ginputAct = QtWidgets.QAction(QIcon(os.getcwd() + '\\images and icons\\ginput.png'),'Ginput')
         self.ginputPermission = False # ginputPermission will initially be False        
-        self.scaleAct = QtWidgets.QAction(QIcon(os.getcwd() + '\\icon logos\\scale.png'), 'Scale')
+        self.scaleAct = QtWidgets.QAction(QIcon(os.getcwd() + '\\images and icons\\scale.png'), 'Scale')
         self.doneAct = QtWidgets.QAction('Done')
         
         self.zoomInAct.triggered.connect(self.zoomIn)
@@ -154,10 +187,9 @@ class MyMainWindow(QtWidgets.QMainWindow):
         
         
         #### SET INITIAL PIXMAP AND ADD TO SCENE        
-        self.initPixmap = QPixmap(os.getcwd() + '\\icon logos\\uob logo.png')
+        self.initPixmap = QPixmap(os.getcwd() + '\\images and icons\\uob logo.png')
         self.scene.addPixmap(self.initPixmap)
         self.view.fitInView(QRectF(self.initPixmap.rect()), mode=Qt.KeepAspectRatio)
-        
         
         self.Xs = []
         self.Ys = []
@@ -166,6 +198,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
     def openPNGFile(self):
 
         self.fileName = QtWidgets.QFileDialog.getOpenFileName(self, 'Open Image', os.getcwd(), "PNG Files (*.png)")[0]
+        #### NEED TO GET THIS TO OPEN IN 'DOCUMENTS' FOLDER BY DEFAULT
         if self.fileName == '': ## incase filedialog was closed without choosing image
             pass
         else:
@@ -187,7 +220,6 @@ class MyMainWindow(QtWidgets.QMainWindow):
             self.scaleAct.setEnabled(True)
             self.doneAct.setEnabled(True)
             
-            #### NEED TO GET THIS TO OPEN IN 'DOCUMENTS' FOLDER
             self.updatePixmap()
             
     def updatePixmap(self):
@@ -195,27 +227,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.scene.clear()
         self.scene.addPixmap(self.planPixmap)
         self.view.fitInView(QRectF(self.planPixmap.rect()), mode=Qt.KeepAspectRatio)
-        
     
-    def saveAsPNGFile(self):
-        pass
-    
-    
-    
-    def zoomIn(self):
-        if self.ginputPermission:
-            self.setGinput(False)
-            
-        self.view.scale(1.4, 1.4)
-        return
-        
-    def zoomOut(self):
-        if self.ginputPermission:
-            self.setGinput(False)
-            
-        self.view.scale(0.6, 0.6)
-        return
-       
     def setGinput(self, permission):
         '''
         Method to change the ginputAct QIcon, and change 
@@ -226,19 +238,61 @@ class MyMainWindow(QtWidgets.QMainWindow):
         print('changing ginputPermission to', permission)
         self.ginputPermission = permission
         if self.ginputPermission:
-            self.ginputAct.setIcon(QIcon(os.getcwd() + '\\icon logos\\ginputOn.png'))
+            self.ginputAct.setIcon(QIcon(os.getcwd() + '\\images and icons\\ginputOn.png'))
             self.selectSeatsAct.setText('Disable ginput')
         else:
-            self.ginputAct.setIcon(QIcon(os.getcwd() + '\\icon logos\\ginput.png'))
+            self.ginputAct.setIcon(QIcon(os.getcwd() + '\\images and icons\\ginput.png'))
             self.selectSeatsAct.setText('Enable ginput to select seats')
             
+    def setMove(self, permission):
+        '''
+        Similar to setGinput() - changes the movePermission to 'permission'
+        '''
+        print('changing movePermission to', permission)
+        self.movePermission = permission
+        if self.movePermission:
+            self.movePointAct.setText('Disable move mode')
+        else:
+            self.movePointAct.setText('Enable move mode to adjust selections')
+        
+        
+  
+    def zoomIn(self):
+        if self.ginputPermission:
+            self.setGinput(False)
+        if self.movePermission:
+            self.setMove(False)
+            
+        self.view.scale(1.4, 1.4)
+        return
+        
+    def zoomOut(self):
+        if self.ginputPermission:
+            self.setGinput(False)
+        if self.movePermission:
+            self.setMove(False)
+            
+        self.view.scale(0.6, 0.6)
+        return
+
     def ginput(self):
         # if ginput isn't already enabled, allow it to be
+        if self.movePermission:
+            self.setMove(False)
         if not self.ginputPermission:
             self.setGinput(True)
         # if its already enabled, disable it
         else:
             self.setGinput(False)
+            
+    def movePoint(self):
+        if self.ginputPermission:
+            self.setGinput(False)
+        if not self.movePermission:
+            self.setMove(True)
+        else:
+            self.setMove(False)
+        
             
     def undoSelection(self):
         itemToRemove = self.currentGraphicsEllipseItems.pop()
@@ -258,10 +312,14 @@ class MyMainWindow(QtWidgets.QMainWindow):
     def recordCoord(self, x, y):
         self.Xs.append(x)
         self.Ys.append(y)
-        circleRadius = 10 # plots from top left of circle, so adjustments made to plot centre from mouse tip
-        ellipse = QtWidgets.QGraphicsEllipseItem(x-circleRadius/2, y-circleRadius/2, circleRadius, circleRadius)
+        self.circleRadius = 10 # plots from top left of circle, so adjustments made to plot centre from mouse tip
+        ellipse = QtWidgets.QGraphicsEllipseItem(x-self.circleRadius/2, y-self.circleRadius/2, self.circleRadius, self.circleRadius)
         self.scene.addItem(ellipse)
         self.currentGraphicsEllipseItems.append(ellipse)
+        
+    @pyqtSlot(int)
+    def highlightMove(self, index):
+        pass        
 
     def saveSeats(self):
         self.seatPixelCoords = np.zeros((len(self.currentGraphicsEllipseItems), 2))
@@ -274,12 +332,15 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.plotSocialDistancingCircles()
         
     def plotSocialDistancingCircles(self):
-        circleRadius = 50 # THIS IS NOT TO SCALE!!!!
+        socialCircleRadius = 50 # THIS IS NOT TO SCALE!!!!
         for i in range(self.selectedSeatCoords.shape[0]):
             x = self.selectedSeatCoords[i,0]
             y = self.selectedSeatCoords[i, 1]
-            self.scene.addEllipse(x-circleRadius/2, y-circleRadius/2, circleRadius, circleRadius, pen=QPen(QColor('red')))
-        
+            self.scene.addEllipse(x-socialCircleRadius/2, y-socialCircleRadius/2, socialCircleRadius, socialCircleRadius, pen=QPen(QColor('red')))
+            
+    def saveAsPNGFile(self):
+        pass
+           
  
 app = None
 def main():
