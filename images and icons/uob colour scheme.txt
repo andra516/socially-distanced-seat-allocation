@@ -1,0 +1,5 @@
+dark blue: #1d59af
+blue: #598fd1
+red: #ee2622
+grey: #221f20
+gold: #fbbd09
