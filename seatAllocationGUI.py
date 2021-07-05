@@ -2,8 +2,6 @@
 """
 Created on Mon Jun 28 16:17:23 2021
 
-### MASTER BRANCH
-
 @author: henry
 """
 from PyQt5 import QtWidgets
@@ -63,12 +61,15 @@ class MyGraphicsView(QtWidgets.QGraphicsView):
         
         pixelDistArray = abs(seatPixelPositions**2 - clickPixelPosition**2).sum(axis=1)
         print(pixelDistArray)
-        index = np.argwhere(pixelDistArray < self.parent.circleRadius**2)[0][0]
+        index = np.argwhere(pixelDistArray < self.parent.circleRadius**2)
+        print('inside circle', index)
         ## returns the index of QGraphicsItem where click was inside the radius
         
-        
-        self.communicator.moveClickSignal.emit(index)
-        
+        if len(index) == 1:
+            
+            self.communicator.moveClickSignal.emit(index)
+        else:
+            pass
         
         
         
@@ -314,15 +315,18 @@ class MyMainWindow(QtWidgets.QMainWindow):
     def recordCoord(self, x, y):
         self.Xs.append(x)
         self.Ys.append(y)
-        self.circleRadius = 10 # plots from top left of circle, so adjustments made to plot centre from mouse tip
-        ellipse = QtWidgets.QGraphicsEllipseItem(x-self.circleRadius/2, y-self.circleRadius/2, self.circleRadius, self.circleRadius)
+        self.circleDiameter = 10 # plots from top left of circle, so adjustments made to plot centre from mouse tip
+        ellipse = QtWidgets.QGraphicsEllipseItem(x-self.circleDiameter/2, y-self.circleDiameter/2, self.circleDiameter, self.circleDiameter)
+        ellipse.setPen(QPen(QColor('#1d59af')))                    
         self.scene.addItem(ellipse)
         self.currentGraphicsEllipseItems.append(ellipse)
         
     @pyqtSlot(int)
     def highlightMove(self, index):
         highlightedGraphicsEllipseItem = self.currentGraphicsEllipseItems[index]
-        highlightedGraphicsEllipseItem.setBrush(QBrush(QColor()))
+        highlightedGraphicsEllipseItem.setBrush(QBrush(QColor('#ee2622')))
+        
+                                                        
 
     def saveSeats(self):
         self.seatPixelCoords = np.zeros((len(self.currentGraphicsEllipseItems), 2))
