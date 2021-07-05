@@ -33,8 +33,7 @@ class MyGraphicsView(QtWidgets.QGraphicsView):
     def mousePressEvent(self, event):
         print('mouse press event local pos', event.localPos().toPoint())
         if self.parent.ginputPermission:
-            self.handleGinput(event)
-            
+            self.handleGinput(event)    
         elif self.parent.movePermission:
             self.handleMove(event)
         else:
@@ -53,24 +52,19 @@ class MyGraphicsView(QtWidgets.QGraphicsView):
         
 #        print(seatPixelPositions)
         scenePressPoint = self.mapToScene(event.localPos().toPoint())
-        
         clickPixelPosition = np.zeros(seatPixelPositions.shape)
         clickPixelPosition[:,0] = scenePressPoint.x()
         clickPixelPosition[:,1] = scenePressPoint.y()
-#        print(clickPixelPosition)
         
-        pixelDistArray = abs(seatPixelPositions**2 - clickPixelPosition**2).sum(axis=1)
-        print(pixelDistArray)
-        index = np.argwhere(pixelDistArray < self.parent.circleRadius**2)
-        print('inside circle', index)
-        ## returns the index of QGraphicsItem where click was inside the radius
-        
-        if len(index) == 1:
-            
+        pixelDistArray = (abs(seatPixelPositions - clickPixelPosition)**2).sum(axis=1)
+        try:
+            index = int(np.argwhere(pixelDistArray < self.parent.circleDiameter**2)) # return the index of QGraphicsItem where click is inside radius
             self.communicator.moveClickSignal.emit(index)
-        else:
+        except TypeError:
+            ## probably due to circles overlapping.
+            min_index = np.argmin(pixelDistArray)
+            self.communicator.moveClickSignal.emit(min_index)            
             pass
-        
         
         
         
@@ -106,6 +100,9 @@ class MyMainWindow(QtWidgets.QMainWindow):
     
         self.openAct.triggered.connect(self.openPNGFile)
         self.saveAct.triggered.connect(self.saveAsPNGFile)
+        
+        
+        self.openAct.setShortcut(QKeySequence('Ctrl+O'))
                 
         self.fileMenu.addAction(self.openAct)
         self.fileMenu.addAction(self.loadSeatsAct)
@@ -198,11 +195,34 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.Ys = []
         self.currentGraphicsEllipseItems = []
         
+        self.quickSetup() ## purely for testing to speed up process of opening file
+        
+    def quickSetup(self):
+        self.loadSeatsAct.setEnabled(True)
+        #            self.saveAct.setEnabled(True)
+        # ginput actions
+        self.selectSeatsAct.setEnabled(True)
+        self.undoSelectAct.setEnabled(True)
+        self.movePointAct.setEnabled(True)
+        self.clearAllAct.setEnabled(True)
+        self.doneAndRunAct.setEnabled(True)
+        # toolbar actions
+        self.ginputAct.setEnabled(True)
+        self.zoomInAct.setEnabled(True)
+        self.zoomOutAct.setEnabled(True)
+        self.ginputAct.setEnabled(True)
+        self.scaleAct.setEnabled(True)
+        self.doneAct.setEnabled(True)
+        
+        print(os.getcwd() + '\\Room Plans\\Aston Webb C Block - Lower Ground Floor Plan.pdf-Page1.png')
+        self.updatePixmap(os.getcwd() + '\\Room Plans\\Aston Webb C Block - Lower Ground Floor Plan.pdf-Page1.png')
+        
+        
     def openPNGFile(self):
 
-        self.fileName = QtWidgets.QFileDialog.getOpenFileName(self, 'Open Image', os.getcwd(), "PNG Files (*.png)")[0]
+        fileName = QtWidgets.QFileDialog.getOpenFileName(self, 'Open Image', os.getcwd(), "PNG Files (*.png)")[0]
         #### NEED TO GET THIS TO OPEN IN 'DOCUMENTS' FOLDER BY DEFAULT
-        if self.fileName == '': ## incase filedialog was closed without choosing image
+        if fileName == '': ## incase filedialog was closed without choosing image
             pass
         else:
             ### ENSURE ALL ACTIONS ARE ENABLED
@@ -223,10 +243,10 @@ class MyMainWindow(QtWidgets.QMainWindow):
             self.scaleAct.setEnabled(True)
             self.doneAct.setEnabled(True)
             
-            self.updatePixmap()
+            self.updatePixmap(fileName)
             
-    def updatePixmap(self):
-        self.planPixmap = QPixmap(self.fileName)
+    def updatePixmap(self, fileName):
+        self.planPixmap = QPixmap(fileName)
         self.scene.clear()
         self.scene.addPixmap(self.planPixmap)
         self.view.fitInView(QRectF(self.planPixmap.rect()), mode=Qt.KeepAspectRatio)
