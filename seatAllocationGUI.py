@@ -261,9 +261,9 @@ class MyMainWindow(QtWidgets.QMainWindow):
         '''
         sets the mode the app is in
         0 - None
-        1 - ginput
-        2 - move
-        3 -        
+        1 - Ginput Mode
+        2 - Move Mode
+        etc.
         '''        
         if mode_code == 0:
             # disable everything
@@ -276,7 +276,6 @@ class MyMainWindow(QtWidgets.QMainWindow):
         elif mode_code == 1:
             # enable ginput and disable others
             print('changing to mode: Ginput')
-            print('disabling move mode')
             # enable ginput
             self.ginputAct.setIcon(QIcon(os.getcwd() + '\\images and icons\\ginputOn.png'))
             self.selectSeatsAct.setText('Disable ginput')
@@ -285,7 +284,6 @@ class MyMainWindow(QtWidgets.QMainWindow):
         elif mode_code == 2:
             # enable move and disable others
             print('changing to mode: Move')
-            print('disabling ginput mode')
             # disable ginput
             self.ginputAct.setIcon(QIcon(os.getcwd() + '\\images and icons\\ginput.png'))
             self.selectSeatsAct.setText('Enable ginput to select seats')
@@ -293,33 +291,6 @@ class MyMainWindow(QtWidgets.QMainWindow):
             self.movePointAct.setText('Disable move mode')
             
         self.mode = mode_code
-    
-    def setGinput(self, permission):
-        '''
-        Method to change the ginputAct QIcon, and change 
-        ginputPermission attribute to 'permission'
-        Inputs
-            permission : bool - what ginputPermission should be set to.
-        '''
-        print('changing ginputPermission to', permission)
-        self.ginputPermission = permission
-        if self.ginputPermission:
-            self.ginputAct.setIcon(QIcon(os.getcwd() + '\\images and icons\\ginputOn.png'))
-            self.selectSeatsAct.setText('Disable ginput')
-        else:
-            self.ginputAct.setIcon(QIcon(os.getcwd() + '\\images and icons\\ginput.png'))
-            self.selectSeatsAct.setText('Enable ginput to select seats')
-            
-    def setMove(self, permission):
-        '''
-        Similar to setGinput() - changes the movePermission to 'permission'
-        '''
-        print('changing movePermission to', permission)
-        self.movePermission = permission
-        if self.movePermission:
-            self.movePointAct.setText('Disable move mode')
-        else:
-            self.movePointAct.setText('Enable move mode to adjust selections')  
   
     def zoomIn(self):
         if self.mode != 0:
@@ -381,9 +352,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
     @pyqtSlot(int)
     def highlightMove(self, index):
         highlightedGraphicsEllipseItem = self.currentGraphicsEllipseItems[index]
-        highlightedGraphicsEllipseItem.setBrush(QBrush(QColor('#ee2622')))
-        
-                                                        
+        highlightedGraphicsEllipseItem.setBrush(QBrush(QColor('#ee2622')))                                                
 
     def saveSeats(self):
         self.seatPixelCoords = np.zeros((len(self.currentGraphicsEllipseItems), 2))
