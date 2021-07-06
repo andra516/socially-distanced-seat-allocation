@@ -57,13 +57,18 @@ class MyGraphicsView(QtWidgets.QGraphicsView):
         clickPixelPosition[:,1] = scenePressPoint.y()
         
         pixelDistArray = (abs(seatPixelPositions - clickPixelPosition)**2).sum(axis=1)
+        print('min dist', np.min(pixelDistArray), 'circle #', np.argmin(pixelDistArray))
+        print(self.parent.circleDiameter/2)
+           
         try:
-            index = int(np.argwhere(pixelDistArray < self.parent.circleDiameter**2)) # return the index of QGraphicsItem where click is inside radius
+            index = int(np.argwhere(pixelDistArray < (self.parent.circleDiameter*1.2/2)**2)) # return the index of QGraphicsItem where click is at least within 1.2xradius
             self.communicator.moveClickSignal.emit(index)
-        except TypeError:
+        except Exception as e:
+            print('Error, try again', e.__class__.__name__)
+            print(e)
             ## probably due to circles overlapping.
-            min_index = np.argmin(pixelDistArray)
-            self.communicator.moveClickSignal.emit(min_index)            
+            ## possible errors: 1) click was outside circle circumference: TypeError - only size-1 arrays can be converted to Python scalars
+            ### 2) circles are overlapping and you click at intersection - again TypeError.
             pass
         
         
@@ -216,6 +221,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         
         print(os.getcwd() + '\\Room Plans\\Aston Webb C Block - Lower Ground Floor Plan.pdf-Page1.png')
         self.updatePixmap(os.getcwd() + '\\Room Plans\\Aston Webb C Block - Lower Ground Floor Plan.pdf-Page1.png')
+        self.view.scale(10,10)
         
         
     def openPNGFile(self):
@@ -276,9 +282,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         if self.movePermission:
             self.movePointAct.setText('Disable move mode')
         else:
-            self.movePointAct.setText('Enable move mode to adjust selections')
-        
-        
+            self.movePointAct.setText('Enable move mode to adjust selections')  
   
     def zoomIn(self):
         if self.ginputPermission:
