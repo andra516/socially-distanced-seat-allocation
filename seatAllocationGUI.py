@@ -29,7 +29,7 @@ class MyGraphicsView(QtWidgets.QGraphicsView):
         
         self.communicator = Communication()
         self.communicator.ginputClickSignal.connect(parent.recordCoord)
-        self.communicator.moveClickSignal.connect(parent.highlightMove)
+        self.communicator.moveClickSignal.connect(parent.setMoveHighlight)
     
     def mousePressEvent(self, event):
         print('mouse press event local pos', event.localPos().toPoint())
@@ -47,6 +47,13 @@ class MyGraphicsView(QtWidgets.QGraphicsView):
         self.communicator.ginputClickSignal.emit(x, y)
         
     def handleMove(self, event):
+        '''
+        currently built to return the index of the ellipse item that a click is within
+        want it to emit a signal with either: index of graphics item click was within
+        or None if the click was outside - returning None is a bit tricky - need to look up how you
+        emit multiple datatypes
+        '''
+        
         seatPixelPositions = np.zeros((len(self.parent.Xs), 2))
         seatPixelPositions[:,0] = self.parent.Xs
         seatPixelPositions[:,1] = self.parent.Ys
@@ -58,20 +65,34 @@ class MyGraphicsView(QtWidgets.QGraphicsView):
         clickPixelPosition[:,1] = scenePressPoint.y()
         
         pixelDistArray = (abs(seatPixelPositions - clickPixelPosition)**2).sum(axis=1)
-        print('min dist', np.min(pixelDistArray), 'circle #', np.argmin(pixelDistArray))
-        print(self.parent.circleDiameter/2)
-           
-        try:
-            index = int(np.argwhere(pixelDistArray < (self.parent.circleDiameter*1.2/2)**2)) # return the index of QGraphicsItem where click is at least within 1.2xradius
-            self.communicator.moveClickSignal.emit(index)
-        except Exception as e:
-            print('Error, try again', e.__class__.__name__)
-            print(e)
-            ## probably due to circles overlapping.
-            ## possible errors: 1) click was outside circle circumference: TypeError - only size-1 arrays can be converted to Python scalars
-            ### 2) circles are overlapping and you click at intersection - again TypeError.
-            pass
         
+        indexArray = np.argwhere(pixelDistArray < (self.parent.circleDiameter*1.5/2)**2)
+        
+        if indexArray.shape != (0, 1):
+            print(indexArray.item())
+            self.communicator.moveClickSignal.emit(indexArray.item())
+        else:
+            self.communicator.moveClickSignal.emit(-1)
+        
+#        try:
+#            index = np.argwhere(pixelDistArray < (self.parent.circleDiameter*1.5/2)**2)
+#
+#
+#        except ValueError:
+#            print(np.argwhere(pixelDistArray < (self.parent.circleDiameter*1.5/2)**2).shape)
+#        
+##        
+#        try:
+#            index = int(np.argwhere(pixelDistArray < (self.parent.circleDiameter*1.2/2)**2)) # return the index of QGraphicsItem where click is at least within 1.2xradius
+#            self.communicator.moveClickSignal.emit(index)
+#        except Exception as e:
+#            print('Error, try again', e.__class__.__name__)
+#            print(e)
+#            ## probably due to circles overlapping.
+#            ## possible errors: 1) click was outside circle circumference: TypeError - only size-1 arrays can be converted to Python scalars
+#            ### 2) circles are overlapping and you click at intersection - again TypeError.
+#            pass
+#        
         
         
 
@@ -194,17 +215,24 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.scene.addPixmap(self.initPixmap)
         self.view.fitInView(QRectF(self.initPixmap.rect()), mode=Qt.KeepAspectRatio)
         
+        
+        
         self.Xs = []
         self.Ys = []
         self.currentGraphicsEllipseItems = []
+        ## initialise brushes:
+        self.opaqueHighlightBrush = QBrush(QColor(238,38,34,255))
+        self.transparentHighlightBrush = QBrush(QColor(238,38,34,0))
         
         self.mode = None
+        self.moveHighlightIndex = None # varibale that holds index of item currently highlighted for moving
+        
         
         self.quickSetup() ## purely for testing to speed up process of opening file
         
     def quickSetup(self):
         self.loadSeatsAct.setEnabled(True)
-        #            self.saveAct.setEnabled(True)
+#        self.saveAct.setEnabled(True)
         # ginput actions
         self.selectSeatsAct.setEnabled(True)
         self.undoSelectAct.setEnabled(True)
@@ -222,8 +250,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         print(os.getcwd() + '\\Room Plans\\Aston Webb C Block - Lower Ground Floor Plan.pdf-Page1.png')
         self.updatePixmap(os.getcwd() + '\\Room Plans\\Aston Webb C Block - Lower Ground Floor Plan.pdf-Page1.png')
         self.view.scale(10,10)
-        
-        
+             
     def openPNGFile(self):
 
         fileName = QtWidgets.QFileDialog.getOpenFileName(self, 'Open Image', os.getcwd(), "PNG Files (*.png)")[0]
@@ -249,6 +276,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
             self.scaleAct.setEnabled(True)
             self.doneAct.setEnabled(True)
             
+            
             self.updatePixmap(fileName)
             
     def updatePixmap(self, fileName):
@@ -256,6 +284,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.scene.clear()
         self.scene.addPixmap(self.planPixmap)
         self.view.fitInView(QRectF(self.planPixmap.rect()), mode=Qt.KeepAspectRatio)
+        self.view.scale(1.2, 1.2)
     
     def setMode(self, mode_code):
         '''
@@ -271,7 +300,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
             print('changing to mode: None')
             self.ginputAct.setIcon(QIcon(os.getcwd() + '\\images and icons\\ginput.png'))
             self.selectSeatsAct.setText('Enable ginput to select seats')
-            # disable move mode:
+            # disable move mode and setBrushes:
             self.movePointAct.setText('Enable move mode to adjust selections')
         elif mode_code == 1:
             # enable ginput and disable others
@@ -289,6 +318,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
             self.selectSeatsAct.setText('Enable ginput to select seats')
             # enable move
             self.movePointAct.setText('Disable move mode')
+        
             
         self.mode = mode_code
   
@@ -342,17 +372,32 @@ class MyMainWindow(QtWidgets.QMainWindow):
     @pyqtSlot(float, float)
     def recordCoord(self, x, y):
         self.Xs.append(x)
-        self.Ys.append(y)
+        self.Ys.append(y)       
         self.circleDiameter = 10 # plots from top left of circle, so adjustments made to plot centre from mouse tip
         ellipse = QtWidgets.QGraphicsEllipseItem(x-self.circleDiameter/2, y-self.circleDiameter/2, self.circleDiameter, self.circleDiameter)
-        ellipse.setPen(QPen(QColor('#1d59af')))                    
+        ellipse.setPen(QPen(QColor('#1d59af')))
+        ellipse.setBrush(self.transparentHighlightBrush)        
+                                   
         self.scene.addItem(ellipse)
         self.currentGraphicsEllipseItems.append(ellipse)
         
     @pyqtSlot(int)
-    def highlightMove(self, index):
+    def setMoveHighlight(self, index):
         highlightedGraphicsEllipseItem = self.currentGraphicsEllipseItems[index]
-        highlightedGraphicsEllipseItem.setBrush(QBrush(QColor('#ee2622')))                                                
+
+#        if self.moveHighlightIndex is None:
+            # if no seat is currently highlighted
+        highlightedGraphicsEllipseItem.setBrush(self.opaqueHighlightBrush)     
+#        elif self.moveHighlightIndex == index:
+            # if seat already highlighted is clicked, 
+#            highlightedGraphicsEllipseItem.setBrush(self.transparentHighlightBrush)
+        
+            
+            ## if no seat is highlighted
+                        
+#        else:
+#            pass
+                                                     
 
     def saveSeats(self):
         self.seatPixelCoords = np.zeros((len(self.currentGraphicsEllipseItems), 2))
