@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Mon Jun 28 16:17:23 2021
+JonathanWatkins
 
 @author: henry
 """
@@ -32,12 +33,12 @@ class MyGraphicsView(QtWidgets.QGraphicsView):
     
     def mousePressEvent(self, event):
         print('mouse press event local pos', event.localPos().toPoint())
-        if self.parent.ginputPermission:
-            self.handleGinput(event)    
-        elif self.parent.movePermission:
-            self.handleMove(event)
-        else:
+        if self.parent.mode == 0:
             pass
+        elif self.parent.mode == 1:
+            self.handleGinput(event)
+        elif self.parent.mode == 2:
+            self.handleMove(event)
         
     def handleGinput(self, event):
         scenePressPoint = self.mapToScene(event.localPos().toPoint()) # this is a QPointF
@@ -75,7 +76,7 @@ class MyGraphicsView(QtWidgets.QGraphicsView):
         
 
 class MyMainWindow(QtWidgets.QMainWindow):
-    
+   
     def __init__(self):
         QtWidgets.QMainWindow.__init__(self)
         self.setWindowTitle('Seat Allocation')
@@ -106,7 +107,6 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.openAct.triggered.connect(self.openPNGFile)
         self.saveAct.triggered.connect(self.saveAsPNGFile)
         
-        
         self.openAct.setShortcut(QKeySequence('Ctrl+O'))
                 
         self.fileMenu.addAction(self.openAct)
@@ -118,7 +118,6 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.selectSeatsAct = QtWidgets.QAction('Enable ginput to select seats')
         self.undoSelectAct = QtWidgets.QAction('Undo last selection')
         self.movePointAct = QtWidgets.QAction('Move selections')
-        self.movePermission = False
         self.clearAllAct = QtWidgets.QAction('Clear all selections')
         self.doneAndRunAct = QtWidgets.QAction('Done and run allocator')
         ### initially all disabled
@@ -156,8 +155,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.toolbar.setOrientation(Qt.Horizontal)
         self.zoomInAct = QtWidgets.QAction(QIcon(os.getcwd() + '\\images and icons\\zoomIn.png'), 'Zoom In')
         self.zoomOutAct = QtWidgets.QAction(QIcon(os.getcwd() + '\\images and icons\\zoomOut.png'), 'Zoom Out')
-        self.ginputAct = QtWidgets.QAction(QIcon(os.getcwd() + '\\images and icons\\ginput.png'),'Ginput')
-        self.ginputPermission = False # ginputPermission will initially be False        
+        self.ginputAct = QtWidgets.QAction(QIcon(os.getcwd() + '\\images and icons\\ginput.png'),'Ginput')     
         self.scaleAct = QtWidgets.QAction(QIcon(os.getcwd() + '\\images and icons\\scale.png'), 'Scale')
         self.doneAct = QtWidgets.QAction('Done')
         
@@ -199,6 +197,8 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.Xs = []
         self.Ys = []
         self.currentGraphicsEllipseItems = []
+        
+        self.mode = None
         
         self.quickSetup() ## purely for testing to speed up process of opening file
         
@@ -257,6 +257,43 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.scene.addPixmap(self.planPixmap)
         self.view.fitInView(QRectF(self.planPixmap.rect()), mode=Qt.KeepAspectRatio)
     
+    def setMode(self, mode_code):
+        '''
+        sets the mode the app is in
+        0 - None
+        1 - ginput
+        2 - move
+        3 -        
+        '''        
+        if mode_code == 0:
+            # disable everything
+            # ginput mode disable:
+            print('changing to mode: None')
+            self.ginputAct.setIcon(QIcon(os.getcwd() + '\\images and icons\\ginput.png'))
+            self.selectSeatsAct.setText('Enable ginput to select seats')
+            # disable move mode:
+            self.movePointAct.setText('Enable move mode to adjust selections')
+        elif mode_code == 1:
+            # enable ginput and disable others
+            print('changing to mode: Ginput')
+            print('disabling move mode')
+            # enable ginput
+            self.ginputAct.setIcon(QIcon(os.getcwd() + '\\images and icons\\ginputOn.png'))
+            self.selectSeatsAct.setText('Disable ginput')
+            # disable move:
+            self.movePointAct.setText('Enable move mode to adjust selections')  
+        elif mode_code == 2:
+            # enable move and disable others
+            print('changing to mode: Move')
+            print('disabling ginput mode')
+            # disable ginput
+            self.ginputAct.setIcon(QIcon(os.getcwd() + '\\images and icons\\ginput.png'))
+            self.selectSeatsAct.setText('Enable ginput to select seats')
+            # enable move
+            self.movePointAct.setText('Disable move mode')
+            
+        self.mode = mode_code
+    
     def setGinput(self, permission):
         '''
         Method to change the ginputAct QIcon, and change 
@@ -285,42 +322,38 @@ class MyMainWindow(QtWidgets.QMainWindow):
             self.movePointAct.setText('Enable move mode to adjust selections')  
   
     def zoomIn(self):
-        if self.ginputPermission:
-            self.setGinput(False)
-        if self.movePermission:
-            self.setMove(False)
+        if self.mode != 0:
+            self.setMode(0)
+        else:
+            pass
             
         self.view.scale(1.4, 1.4)
         return
         
     def zoomOut(self):
-        if self.ginputPermission:
-            self.setGinput(False)
-        if self.movePermission:
-            self.setMove(False)
+        # if not in None mode, disable all
+        if self.mode != 0:
+            self.setMode(0)
+        else:
+            pass
             
         self.view.scale(0.6, 0.6)
         return
 
     def ginput(self):
-        # if ginput isn't already enabled, allow it to be
-        if self.movePermission:
-            self.setMove(False)
-        if not self.ginputPermission:
-            self.setGinput(True)
-        # if its already enabled, disable it
-        else:
-            self.setGinput(False)
+        # if its already enabled, disable
+        if self.mode == 1:
+            self.setMode(0)
+        else:         # if in any other mode is enabled, set to ginput mode
+            self.setMode(1)
             
     def movePoint(self):
-        if self.ginputPermission:
-            self.setGinput(False)
-        if not self.movePermission:
-            self.setMove(True)
-        else:
-            self.setMove(False)
+        # if already enabled, disable
+        if self.mode == 2:
+            self.setMode(0)
+        else:       # if any other mode is enabled, set to move mode
+            self.setMode(2)
         
-            
     def undoSelection(self):
         itemToRemove = self.currentGraphicsEllipseItems.pop()
         self.scene.removeItem(itemToRemove)
