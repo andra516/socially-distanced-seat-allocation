@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Mon Jun 28 16:17:23 2021
-JonathanWatkins
+## saveAndThreadDev
 
 @author: henry
 """
@@ -13,6 +13,7 @@ import os
 #import time
 import numpy as np
 from seatAllocationAlgorithmJon import jonsAllocator
+import seatAllocationIO
 
 class Communication(QObject):
     
@@ -120,13 +121,13 @@ class MyMainWindow(QtWidgets.QMainWindow):
         ### FILE MENU BAR ACTIONS
         self.openAct = QtWidgets.QAction('Open')
         self.loadSeatsAct = QtWidgets.QAction('Load seats') # pixel coordinates from previously found maps
-        self.saveAct = QtWidgets.QAction('Save seating plan')
+        self.saveAct = QtWidgets.QAction('Save current seat allocation session')
         # initially all disabled
         self.loadSeatsAct.setEnabled(False)
         self.saveAct.setEnabled(False)
     
         self.openAct.triggered.connect(self.openPNGFile)
-        self.saveAct.triggered.connect(self.saveAsPNGFile)
+        self.saveAct.triggered.connect(self.saveSession)
         
         self.openAct.setShortcut(QKeySequence('Ctrl+O'))
                 
@@ -152,8 +153,9 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.undoSelectAct.triggered.connect(self.undoSelection)
         self.clearAllAct.triggered.connect(self.clearSelections)
         self.movePointAct.triggered.connect(self.movePoint)
-        self.doneAndRunAct.triggered.connect(self.saveSeats)
+        self.doneAndRunAct.triggered.connect(self.doneAndRun)
         
+        self.selectSeatsAct.setShortcut(QKeySequence('Ctrl+G'))
         self.undoSelectAct.setShortcut(QKeySequence('Ctrl+Z'))
               
         self.ginputMenu.addAction(self.selectSeatsAct)
@@ -183,7 +185,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.zoomInAct.triggered.connect(self.zoomIn)
         self.zoomOutAct.triggered.connect(self.zoomOut)
         self.ginputAct.triggered.connect(self.ginput)
-        self.doneAct.triggered.connect(self.saveSeats)
+        self.doneAct.triggered.connect(self.doneAndRun)
         
         self.ginputAct.setEnabled(False)
         self.zoomInAct.setEnabled(False)
@@ -236,7 +238,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         # ginput actions
         self.selectSeatsAct.setEnabled(True)
         self.undoSelectAct.setEnabled(True)
-        self.movePointAct.setEnabled(True)
+#        self.movePointAct.setEnabled(True)
         self.clearAllAct.setEnabled(True)
         self.doneAndRunAct.setEnabled(True)
         # toolbar actions
@@ -253,9 +255,9 @@ class MyMainWindow(QtWidgets.QMainWindow):
              
     def openPNGFile(self):
 
-        fileName = QtWidgets.QFileDialog.getOpenFileName(self, 'Open Image', os.getcwd(), "PNG Files (*.png)")[0]
+        self.fileName = QtWidgets.QFileDialog.getOpenFileName(self, 'Open Image', os.getcwd(), "PNG Files (*.png)")[0]
         #### NEED TO GET THIS TO OPEN IN 'DOCUMENTS' FOLDER BY DEFAULT
-        if fileName == '': ## incase filedialog was closed without choosing image
+        if self.fileName == '': ## incase filedialog was closed without choosing image
             pass
         else:
             ### ENSURE ALL ACTIONS ARE ENABLED
@@ -265,7 +267,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
             # ginput actions
             self.selectSeatsAct.setEnabled(True)
             self.undoSelectAct.setEnabled(True)
-            self.movePointAct.setEnabled(True)
+#            self.movePointAct.setEnabled(True)
             self.clearAllAct.setEnabled(True)
             self.doneAndRunAct.setEnabled(True)
             # toolbar actions
@@ -277,7 +279,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
             self.doneAct.setEnabled(True)
             
             
-            self.updatePixmap(fileName)
+            self.updatePixmap(self.fileName)
             
     def updatePixmap(self, fileName):
         self.planPixmap = QPixmap(fileName)
@@ -356,11 +358,16 @@ class MyMainWindow(QtWidgets.QMainWindow):
             self.setMode(2)
         
     def undoSelection(self):
-        itemToRemove = self.currentGraphicsEllipseItems.pop()
-        self.scene.removeItem(itemToRemove)
+        try:
+            itemToRemove = self.currentGraphicsEllipseItems.pop()
+            self.scene.removeItem(itemToRemove)
+        except IndexError:
+            pass
         self.Xs.pop()
         self.Ys.pop()
-        
+        if len(self.Xs)==0:
+            self.saveAct.setEnabled(False) # disables saving if no seats selected.
+
     def clearSelections(self):
         ### ADD CAUTIONARY WINDOW TO STOP IF NOT WANTED
         self.scene.clear()
@@ -368,6 +375,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.currentGraphicsEllipseItems = []
         self.Xs = []
         self.Ys = []
+        self.saveAct.setEnabled(False)
         
     @pyqtSlot(float, float)
     def recordCoord(self, x, y):
@@ -380,6 +388,8 @@ class MyMainWindow(QtWidgets.QMainWindow):
                                    
         self.scene.addItem(ellipse)
         self.currentGraphicsEllipseItems.append(ellipse)
+        
+        self.saveAct.setEnabled(True)
         
     @pyqtSlot(int)
     def setMoveHighlight(self, index):
@@ -399,12 +409,14 @@ class MyMainWindow(QtWidgets.QMainWindow):
 #            pass
                                                      
 
-    def saveSeats(self):
+    def doneAndRun(self):
         self.seatPixelCoords = np.zeros((len(self.currentGraphicsEllipseItems), 2))
         self.seatPixelCoords[:,0] = self.Xs
         self.seatPixelCoords[:,1] = self.Ys
         
-        np.savetxt('seatPixelCoords.txt', self.seatPixelCoords)        
+        
+        # replace this with saveSession eventually
+        np.savetxt('seatPixelCoords.txt', self.seatPixelCoords)
         self.selectedSeatCoords = jonsAllocator(self.seatPixelCoords)
         
         self.plotSocialDistancingCircles()
@@ -416,9 +428,15 @@ class MyMainWindow(QtWidgets.QMainWindow):
             y = self.selectedSeatCoords[i, 1]
             self.scene.addEllipse(x-socialCircleRadius/2, y-socialCircleRadius/2, socialCircleRadius, socialCircleRadius, pen=QPen(QColor('red')))
             
-    def saveAsPNGFile(self):
-        pass
-           
+    def saveSession(self):
+        dialog = QtWidgets.QFileDialog()
+        dialog.setFileMode(QtWidgets.QFileDialog.DirectoryOnly)
+        if dialog.exec_():
+            directory = dialog.selectedFiles()
+            print(directory)
+            seatAllocationIO.saveSession(directory, self.fileName, self.Xs, self.Ys)
+        else:
+            pass
  
 app = None
 def main():
