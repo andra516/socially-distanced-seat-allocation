@@ -10,22 +10,23 @@ allocation sessions
 
 import numpy as np
 import os
+import shutil
 
 
 
 def saveSession(directory, PNGFilePath, Xs, Ys):
     '''
-    Function that saves a copy of the PNG in the seat allocation session and a
-    .txt file of selected seat coordinates to a new folder at the directory location
+    Function that saves the progress made in selecting seats in a given room plan.
     
-    Eventually will also save indices of selected seats which have been
-    chosen for the allocation to a seperate .txt file
+    - Saves a copy of the room plan .png which seats have been placed onto to new folder specific to that room and attempt/session
+    - Saves a numpy array of seat coordinates (in pixels on the .png) to a .txt file named : 'seatPixelCoords - Session #{num}.txt'
+    - Eventually will also save indices of selected seats which have been chosen for the allocation to a seperate .txt file
     
-    ## Inputs:\n
-        > directory, str of directory path new folder should be created within\n
-        > PNGFilePath, str of the seating plan .png file path\n
-        > Xs - list of floats of all X coordinates (in pixel space) of selected seats to be saved\n
-        > Ys - list of floats\n
+    Inputs:\n
+        > directory, str of directory path new folder should be created within.\n
+        > PNGFilePath, str of the seating plan .png file path.\n
+        > Xs - list of floats of all X coordinates (in pixel space) of selected seats to be saved.\n
+        > Ys - list of floats.\n
     
     '''
 #    print(directory, '\n', PNGFilePath,'\n', Xs,'\n', Ys)
@@ -35,19 +36,24 @@ def saveSession(directory, PNGFilePath, Xs, Ys):
     ## this is genuinely the most horrific way of doing things - I'm so sorry
     while True:
         try:
-            saveDirectoryName = directory + '\\Seat Allocation Session #' + str(sessionNum) + ' - ' + os.path.splitext(os.path.basename(PNGFilePath))[0]
-            os.mkdir(saveDirectoryName)
+            saveDirectory = directory + '\\Seat Allocation Session #' + str(sessionNum) + ' - ' + os.path.splitext(os.path.basename(PNGFilePath))[0]
+            os.mkdir(saveDirectory)
             break
         except FileExistsError:
             sessionNum += 1
             continue
+    ## SAVE COPY OF .PNG TO NEW SAVEDIRECTORY
+    shutil.copy(PNGFilePath, saveDirectory)
+    
+    ## SAVE SELECTED SEAT PIXEL COORDINATES
     seatPixelCoords = np.zeros(shape=(len(Xs),2))
     seatPixelCoords[:,0] = Xs
     seatPixelCoords[:,1] = Ys
 
-    seatCoordFilePath = saveDirectoryName + '\\seatPixelCoords - Session #' + str(sessionNum) + '.txt'
+    seatCoordFilePath = saveDirectory + '\\seatPixelCoords - Session #' + str(sessionNum) + '.txt'
     np.savetxt(seatCoordFilePath, seatPixelCoords)
-    
+
+    ## (eventually) SAVE ALLOCATED SEAT COORDS/INDICES
                 
     
     
