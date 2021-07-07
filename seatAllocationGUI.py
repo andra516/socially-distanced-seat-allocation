@@ -72,7 +72,7 @@ class MyGraphicsView(QtWidgets.QGraphicsView):
             print(indexArray.item())
             self.communicator.moveClickSignal.emit(indexArray.item())
         else:
-            self.communicator.moveClickSignal.emit(-1)
+            self.communicator.moveClickSignal.emit()
         
 #        try:
 #            index = np.argwhere(pixelDistArray < (self.parent.circleDiameter*1.5/2)**2)
