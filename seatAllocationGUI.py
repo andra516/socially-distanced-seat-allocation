@@ -102,7 +102,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         QtWidgets.QMainWindow.__init__(self)
         self.setWindowTitle('Seat Allocation')
-#        self.resize(1500, 800)
+        
         self.setGeometry(200, 100, 1200, 700)
         self.show()
         
@@ -120,19 +120,21 @@ class MyMainWindow(QtWidgets.QMainWindow):
         
         ### FILE MENU BAR ACTIONS
         self.openAct = QtWidgets.QAction('Open')
-        self.loadSeatsAct = QtWidgets.QAction('Load seats') # pixel coordinates from previously found maps
+        self.loadSessionAct = QtWidgets.QAction('Load previous session data') # pixel coordinates from previously found maps
         self.saveAct = QtWidgets.QAction('Save current seat allocation session')
+        
         # initially all disabled
-        self.loadSeatsAct.setEnabled(False)
+        self.loadSessionAct.setEnabled(True)
         self.saveAct.setEnabled(False)
     
         self.openAct.triggered.connect(self.openPNGFile)
+        self.loadSessionAct.triggered.connect(self.loadSession)
         self.saveAct.triggered.connect(self.saveSession)
         
         self.openAct.setShortcut(QKeySequence('Ctrl+O'))
                 
         self.fileMenu.addAction(self.openAct)
-        self.fileMenu.addAction(self.loadSeatsAct)
+        self.fileMenu.addAction(self.loadSessionAct)
         self.fileMenu.addAction(self.saveAct)
     
         
@@ -217,23 +219,34 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.scene.addPixmap(self.initPixmap)
         self.view.fitInView(QRectF(self.initPixmap.rect()), mode=Qt.KeepAspectRatio)
         
-        
-        
-        self.Xs = []
-        self.Ys = []
-        self.currentGraphicsEllipseItems = []
+    
         ## initialise brushes:
         self.opaqueHighlightBrush = QBrush(QColor(238,38,34,255))
         self.transparentHighlightBrush = QBrush(QColor(238,38,34,0))
         
-        self.mode = None
+        self.mode = 0
         self.moveHighlightIndex = None # varibale that holds index of item currently highlighted for moving
         
         
-        self.quickSetup() ## purely for testing to speed up process of opening file
+#        self.quickSetup() ## purely for testing to speed up process of opening file
         
-    def quickSetup(self):
-        self.loadSeatsAct.setEnabled(True)
+    def resetSessionVariables(self):
+        '''
+        resets seat coordinate variables,
+        resets GraphicsItem list
+        clears the GraphicsScene
+        resets the mode to None: 0
+        '''
+        self.Xs = []
+        self.Ys = []
+        self.currentGraphicsEllipseItems = []
+#        self.scene.clear()
+        self.setMode(0)
+        self.saveAct.setEnabled(False)
+        
+        
+    def enableActions(self):
+        self.loadSessionAct.setEnabled(True)
 #        self.saveAct.setEnabled(True)
         # ginput actions
         self.selectSeatsAct.setEnabled(True)
@@ -248,10 +261,34 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.ginputAct.setEnabled(True)
         self.scaleAct.setEnabled(True)
         self.doneAct.setEnabled(True)
+    
+    def quickSetup(self):
+        '''
+        Function to be called when testing to setup the Ui in desired format straight away
+        can be customised.
+        '''
         
-        print(os.getcwd() + '\\Room Plans\\Aston Webb C Block - Lower Ground Floor Plan.pdf-Page1.png')
-        self.updatePixmap(os.getcwd() + '\\Room Plans\\Aston Webb C Block - Lower Ground Floor Plan.pdf-Page1.png')
-        self.view.scale(10,10)
+        self.enableActions()
+#        self.loadSessionAct.setEnabled(True)
+##        self.saveAct.setEnabled(True)
+#        # ginput actions
+#        self.selectSeatsAct.setEnabled(True)
+#        self.undoSelectAct.setEnabled(True)
+##        self.movePointAct.setEnabled(True)
+#        self.clearAllAct.setEnabled(True)
+#        self.doneAndRunAct.setEnabled(True)
+#        # toolbar actions
+#        self.ginputAct.setEnabled(True)
+#        self.zoomInAct.setEnabled(True)
+#        self.zoomOutAct.setEnabled(True)
+#        self.ginputAct.setEnabled(True)
+#        self.scaleAct.setEnabled(True)
+#        self.doneAct.setEnabled(True)
+        
+        self.fileName = os.getcwd() + '\\Room Plans\\Aston Webb C Block - Lower Ground Floor Plan.png'
+#        print(self.fileName)
+        self.updatePixmap(self.fileName)
+        self.view.scale(11.5,11.5)
              
     def openPNGFile(self):
 
@@ -261,28 +298,31 @@ class MyMainWindow(QtWidgets.QMainWindow):
             pass
         else:
             ### ENSURE ALL ACTIONS ARE ENABLED
-            # file actions
-            self.loadSeatsAct.setEnabled(True)
-#            self.saveAct.setEnabled(True)
-            # ginput actions
-            self.selectSeatsAct.setEnabled(True)
-            self.undoSelectAct.setEnabled(True)
-#            self.movePointAct.setEnabled(True)
-            self.clearAllAct.setEnabled(True)
-            self.doneAndRunAct.setEnabled(True)
-            # toolbar actions
-            self.ginputAct.setEnabled(True)
-            self.zoomInAct.setEnabled(True)
-            self.zoomOutAct.setEnabled(True)
-            self.ginputAct.setEnabled(True)
-            self.scaleAct.setEnabled(True)
-            self.doneAct.setEnabled(True)
+            self.enableActions()
+#            # file actions
+#            
+#            self.loadSessionAct.setEnabled(True)
+##            self.saveAct.setEnabled(True)
+#            # ginput actions
+#            self.selectSeatsAct.setEnabled(True)
+#            self.undoSelectAct.setEnabled(True)
+##            self.movePointAct.setEnabled(True)
+#            self.clearAllAct.setEnabled(True)
+#            self.doneAndRunAct.setEnabled(True)
+#            # toolbar actions
+#            self.ginputAct.setEnabled(True)
+#            self.zoomInAct.setEnabled(True)
+#            self.zoomOutAct.setEnabled(True)
+#            self.ginputAct.setEnabled(True)
+#            self.scaleAct.setEnabled(True)
+#            self.doneAct.setEnabled(True)
             
             
             self.updatePixmap(self.fileName)
             
     def updatePixmap(self, fileName):
         self.planPixmap = QPixmap(fileName)
+        self.resetSessionVariables()
         self.scene.clear()
         self.scene.addPixmap(self.planPixmap)
         self.view.fitInView(QRectF(self.planPixmap.rect()), mode=Qt.KeepAspectRatio)
@@ -321,7 +361,6 @@ class MyMainWindow(QtWidgets.QMainWindow):
             # enable move
             self.movePointAct.setText('Disable move mode')
         
-            
         self.mode = mode_code
   
     def zoomIn(self):
@@ -367,14 +406,15 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.Ys.pop()
         if len(self.Xs)==0:
             self.saveAct.setEnabled(False) # disables saving if no seats selected.
+            self.setMode(0)
 
     def clearSelections(self):
         ### ADD CAUTIONARY WINDOW TO STOP IF NOT WANTED
+        self.setMode(0)
+        self.resetSessionVariables()
         self.scene.clear()
         self.scene.addPixmap(self.planPixmap)
-        self.currentGraphicsEllipseItems = []
-        self.Xs = []
-        self.Ys = []
+
         self.saveAct.setEnabled(False)
         
     @pyqtSlot(float, float)
@@ -385,11 +425,11 @@ class MyMainWindow(QtWidgets.QMainWindow):
         ellipse = QtWidgets.QGraphicsEllipseItem(x-self.circleDiameter/2, y-self.circleDiameter/2, self.circleDiameter, self.circleDiameter)
         ellipse.setPen(QPen(QColor('#1d59af')))
         ellipse.setBrush(self.transparentHighlightBrush)        
-                                   
+        
         self.scene.addItem(ellipse)
         self.currentGraphicsEllipseItems.append(ellipse)
-        
-        self.saveAct.setEnabled(True)
+        if len(self.Xs) > 0:
+            self.saveAct.setEnabled(True)
         
     @pyqtSlot(int)
     def setMoveHighlight(self, index):
@@ -410,13 +450,13 @@ class MyMainWindow(QtWidgets.QMainWindow):
                                                      
 
     def doneAndRun(self):
+        self.setMode(0)
         self.seatPixelCoords = np.zeros((len(self.currentGraphicsEllipseItems), 2))
         self.seatPixelCoords[:,0] = self.Xs
         self.seatPixelCoords[:,1] = self.Ys
         
-        
         # replace this with saveSession eventually
-        np.savetxt('seatPixelCoords.txt', self.seatPixelCoords)
+        self.saveSession()
         self.selectedSeatCoords = jonsAllocator(self.seatPixelCoords)
         
         self.plotSocialDistancingCircles()
@@ -427,16 +467,45 @@ class MyMainWindow(QtWidgets.QMainWindow):
             x = self.selectedSeatCoords[i,0]
             y = self.selectedSeatCoords[i, 1]
             self.scene.addEllipse(x-socialCircleRadius/2, y-socialCircleRadius/2, socialCircleRadius, socialCircleRadius, pen=QPen(QColor('red')))
-            
-    def saveSession(self):
+        pass
+    
+    def loadSession(self):
         dialog = QtWidgets.QFileDialog()
+        dialog.setDirectory(os.getcwd())
+        dialog.setWindowTitle('Load in a previous session folder')
         dialog.setFileMode(QtWidgets.QFileDialog.DirectoryOnly)
         if dialog.exec_():
-            directory = dialog.selectedFiles()
-            print(directory)
+            directory = dialog.selectedFiles()[0].replace('/', os.sep)
+            
+#            print('directory at loadSession', directory)
+            self.fileName, seatPixelCoords = seatAllocationIO.loadSession(directory)
+            ## Now the PNG and seat coord files have been loaded, set the pixmap and draw coords
+            self.updatePixmap(self.fileName)
+#            print('fileName at loadSession' , self.fileName)
+        
+            for seat in seatPixelCoords:
+                self.recordCoord(seat[0], seat[1])
+        
+            self.enableActions()    
+        else:
+            pass
+
+        
+        
+    def saveSession(self):
+        self.setMode(0)
+        dialog = QtWidgets.QFileDialog()
+        dialog.setWindowTitle('Save Session Data to new Directory')
+        dialog.setDirectory(os.getcwd())
+        dialog.setFileMode(QtWidgets.QFileDialog.DirectoryOnly)
+        if dialog.exec_():
+            directory = dialog.selectedFiles()[0].replace('/', os.sep)
+            ## automatically comes with directory seperators as forward slashes.
             seatAllocationIO.saveSession(directory, self.fileName, self.Xs, self.Ys)
         else:
             pass
+        
+    
  
 app = None
 def main():
