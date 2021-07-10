@@ -13,7 +13,9 @@ import os
 #import time
 import numpy as np
 from seatAllocationAlgorithmJon import jonsAllocator
+from seatAllocationPDFHandler import OpenNewSession
 import seatAllocationIO
+
 
 class Communication(QObject):
     
@@ -113,13 +115,20 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.centralWidget = QtWidgets.QWidget()
         self.mainLayout = QtWidgets.QVBoxLayout()
         
+        ### STATUS BAR
+        self.statusBar = QtWidgets.QStatusBar()
+        self.statusBarLabel = QtWidgets.QLabel('Load or Start an Allocation Session')
+        self.statusBar.addWidget(self.statusBarLabel)
+        self.setStatusBar(self.statusBar)
+        
+        
         ### MENU BAR        
         self.fileMenu = self.menuBar().addMenu('File')
         self.ginputMenu = self.menuBar().addMenu('Ginput')
         
         
         ### FILE MENU BAR ACTIONS
-        self.openAct = QtWidgets.QAction('Open')
+        self.openAct = QtWidgets.QAction('Start new allocation session')
         self.loadSessionAct = QtWidgets.QAction('Load previous session data') # pixel coordinates from previously found maps
         self.saveAct = QtWidgets.QAction('Save current seat allocation session')
         
@@ -291,34 +300,45 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.view.scale(11.5,11.5)
              
     def openPNGFile(self):
-
-        self.fileName = QtWidgets.QFileDialog.getOpenFileName(self, 'Open Image', os.getcwd(), "PNG Files (*.png)")[0]
-        #### NEED TO GET THIS TO OPEN IN 'DOCUMENTS' FOLDER BY DEFAULT
-        if self.fileName == '': ## incase filedialog was closed without choosing image
-            pass
-        else:
-            ### ENSURE ALL ACTIONS ARE ENABLED
-            self.enableActions()
-#            # file actions
+        self.newSessionWindow = OpenNewSession(self)
+        
+        self.newSessionWindow.show()
+#        try:
+#            self.fileName = self.newSessionWindow.pngPath
+#            self.updatePixmap(self.fileName)
+#        except:
+#            pass
+        
+        
+        
+#
+#        self.fileName = QtWidgets.QFileDialog.getOpenFileName(self, 'Open Image', os.getcwd(), "PNG Files (*.png)")[0]
+#        #### NEED TO GET THIS TO OPEN IN 'DOCUMENTS' FOLDER BY DEFAULT
+#        if self.fileName == '': ## incase filedialog was closed without choosing image
+#            pass
+#        else:
+#            ### ENSURE ALL ACTIONS ARE ENABLED
+#            self.enableActions()
+##            # file actions
+##            
+##            self.loadSessionAct.setEnabled(True)
+###            self.saveAct.setEnabled(True)
+##            # ginput actions
+##            self.selectSeatsAct.setEnabled(True)
+##            self.undoSelectAct.setEnabled(True)
+###            self.movePointAct.setEnabled(True)
+##            self.clearAllAct.setEnabled(True)
+##            self.doneAndRunAct.setEnabled(True)
+##            # toolbar actions
+##            self.ginputAct.setEnabled(True)
+##            self.zoomInAct.setEnabled(True)
+##            self.zoomOutAct.setEnabled(True)
+##            self.ginputAct.setEnabled(True)
+##            self.scaleAct.setEnabled(True)
+##            self.doneAct.setEnabled(True)
 #            
-#            self.loadSessionAct.setEnabled(True)
-##            self.saveAct.setEnabled(True)
-#            # ginput actions
-#            self.selectSeatsAct.setEnabled(True)
-#            self.undoSelectAct.setEnabled(True)
-##            self.movePointAct.setEnabled(True)
-#            self.clearAllAct.setEnabled(True)
-#            self.doneAndRunAct.setEnabled(True)
-#            # toolbar actions
-#            self.ginputAct.setEnabled(True)
-#            self.zoomInAct.setEnabled(True)
-#            self.zoomOutAct.setEnabled(True)
-#            self.ginputAct.setEnabled(True)
-#            self.scaleAct.setEnabled(True)
-#            self.doneAct.setEnabled(True)
-            
-            
-            self.updatePixmap(self.fileName)
+#            
+#            self.updatePixmap(self.fileName)
             
     def updatePixmap(self, fileName):
         self.planPixmap = QPixmap(fileName)
@@ -490,8 +510,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         else:
             pass
 
-        
-        
+          
     def saveSession(self):
         self.setMode(0)
         dialog = QtWidgets.QFileDialog()
