@@ -13,7 +13,7 @@ import os
 #import time
 import numpy as np
 from seatAllocationAlgorithmJon import jonsAllocator
-from seatAllocationPDFHandler import OpenNewSession
+from seatAllocationNewSessionHandler import OpenNewSession
 import seatAllocationIO
 
 
@@ -129,14 +129,14 @@ class MyMainWindow(QtWidgets.QMainWindow):
         
         ### FILE MENU BAR ACTIONS
         self.openAct = QtWidgets.QAction('Start new allocation session')
-        self.loadSessionAct = QtWidgets.QAction('Load previous session data') # pixel coordinates from previously found maps
+        self.loadSessionAct = QtWidgets.QAction('Load in previous allocation session') # pixel coordinates from previously found maps
         self.saveAct = QtWidgets.QAction('Save current seat allocation session')
         
         # initially all disabled
         self.loadSessionAct.setEnabled(True)
         self.saveAct.setEnabled(False)
     
-        self.openAct.triggered.connect(self.openPNGFile)
+        self.openAct.triggered.connect(self.startNewSession)
         self.loadSessionAct.triggered.connect(self.loadSession)
         self.saveAct.triggered.connect(self.saveSession)
         
@@ -191,7 +191,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.zoomOutAct = QtWidgets.QAction(QIcon(os.getcwd() + '\\images and icons\\zoomOut.png'), 'Zoom Out')
         self.ginputAct = QtWidgets.QAction(QIcon(os.getcwd() + '\\images and icons\\ginput.png'),'Ginput')     
         self.scaleAct = QtWidgets.QAction(QIcon(os.getcwd() + '\\images and icons\\scale.png'), 'Scale')
-        self.doneAct = QtWidgets.QAction('Done')
+        self.doneAct = QtWidgets.QAction('Done\nand Run')
         
         self.zoomInAct.triggered.connect(self.zoomIn)
         self.zoomOutAct.triggered.connect(self.zoomOut)
@@ -228,7 +228,6 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.scene.addPixmap(self.initPixmap)
         self.view.fitInView(QRectF(self.initPixmap.rect()), mode=Qt.KeepAspectRatio)
         
-    
         ## initialise brushes:
         self.opaqueHighlightBrush = QBrush(QColor(238,38,34,255))
         self.transparentHighlightBrush = QBrush(QColor(238,38,34,0))
@@ -278,70 +277,21 @@ class MyMainWindow(QtWidgets.QMainWindow):
         '''
         
         self.enableActions()
-#        self.loadSessionAct.setEnabled(True)
-##        self.saveAct.setEnabled(True)
-#        # ginput actions
-#        self.selectSeatsAct.setEnabled(True)
-#        self.undoSelectAct.setEnabled(True)
-##        self.movePointAct.setEnabled(True)
-#        self.clearAllAct.setEnabled(True)
-#        self.doneAndRunAct.setEnabled(True)
-#        # toolbar actions
-#        self.ginputAct.setEnabled(True)
-#        self.zoomInAct.setEnabled(True)
-#        self.zoomOutAct.setEnabled(True)
-#        self.ginputAct.setEnabled(True)
-#        self.scaleAct.setEnabled(True)
-#        self.doneAct.setEnabled(True)
-        
-        self.fileName = os.getcwd() + '\\Room Plans\\Aston Webb C Block - Lower Ground Floor Plan.png'
-#        print(self.fileName)
-        self.updatePixmap(self.fileName)
+
+        self.pngPath = os.getcwd() + '\\Room Plans\\Aston Webb C Block - Lower Ground Floor Plan.png'
+#        print(self.pngPath)
+        self.updatePixmap(self.pngPath)
         self.view.scale(11.5,11.5)
              
-    def openPNGFile(self):
+    def startNewSession(self):
         self.newSessionWindow = OpenNewSession(self)
         
         self.newSessionWindow.show()
-#        try:
-#            self.fileName = self.newSessionWindow.pngPath
-#            self.updatePixmap(self.fileName)
-#        except:
-#            pass
-        
-        
-        
-#
-#        self.fileName = QtWidgets.QFileDialog.getOpenFileName(self, 'Open Image', os.getcwd(), "PNG Files (*.png)")[0]
-#        #### NEED TO GET THIS TO OPEN IN 'DOCUMENTS' FOLDER BY DEFAULT
-#        if self.fileName == '': ## incase filedialog was closed without choosing image
-#            pass
-#        else:
-#            ### ENSURE ALL ACTIONS ARE ENABLED
-#            self.enableActions()
-##            # file actions
-##            
-##            self.loadSessionAct.setEnabled(True)
-###            self.saveAct.setEnabled(True)
-##            # ginput actions
-##            self.selectSeatsAct.setEnabled(True)
-##            self.undoSelectAct.setEnabled(True)
-###            self.movePointAct.setEnabled(True)
-##            self.clearAllAct.setEnabled(True)
-##            self.doneAndRunAct.setEnabled(True)
-##            # toolbar actions
-##            self.ginputAct.setEnabled(True)
-##            self.zoomInAct.setEnabled(True)
-##            self.zoomOutAct.setEnabled(True)
-##            self.ginputAct.setEnabled(True)
-##            self.scaleAct.setEnabled(True)
-##            self.doneAct.setEnabled(True)
-#            
-#            
-#            self.updatePixmap(self.fileName)
+        ## updatePixmap() and enableActions() called and self.pngPath assigned in seatAllocationPDFHandler when convertPDF() is called.
+
             
-    def updatePixmap(self, fileName):
-        self.planPixmap = QPixmap(fileName)
+    def updatePixmap(self, pngPath):
+        self.planPixmap = QPixmap(pngPath)
         self.resetSessionVariables()
         self.scene.clear()
         self.scene.addPixmap(self.planPixmap)
@@ -477,53 +427,52 @@ class MyMainWindow(QtWidgets.QMainWindow):
         
         # replace this with saveSession eventually
         self.saveSession()
-        self.selectedSeatCoords = jonsAllocator(self.seatPixelCoords)
+        
+        self.selectedSeatCoords = jonsAllocator(self.seatPixelCoords, self.magicScale)
         
         self.plotSocialDistancingCircles()
         
     def plotSocialDistancingCircles(self):
-        socialCircleRadius = 50 # THIS IS NOT TO SCALE!!!!
+        socialCircleDiameter = 2 * self.magicScale
+        
         for i in range(self.selectedSeatCoords.shape[0]):
             x = self.selectedSeatCoords[i,0]
             y = self.selectedSeatCoords[i, 1]
-            self.scene.addEllipse(x-socialCircleRadius/2, y-socialCircleRadius/2, socialCircleRadius, socialCircleRadius, pen=QPen(QColor('red')))
+            self.scene.addEllipse(x-socialCircleDiameter/2, y-socialCircleDiameter/2, socialCircleDiameter, socialCircleDiameter, pen=QPen(QColor('red')))
         pass
     
     def loadSession(self):
+        
+        
+        ### when loading in a previous file, need the magic scale pre-calculated - needs to go into json file
+        ### need to work out how to save and read from json files
+        
         dialog = QtWidgets.QFileDialog()
         dialog.setDirectory(os.getcwd())
-        dialog.setWindowTitle('Load in a previous session folder')
+        dialog.setWindowTitle('Load in a previous session')
         dialog.setFileMode(QtWidgets.QFileDialog.DirectoryOnly)
         if dialog.exec_():
-            directory = dialog.selectedFiles()[0].replace('/', os.sep)
-            
-#            print('directory at loadSession', directory)
-            self.fileName, seatPixelCoords = seatAllocationIO.loadSession(directory)
-            ## Now the PNG and seat coord files have been loaded, set the pixmap and draw coords
-            self.updatePixmap(self.fileName)
-#            print('fileName at loadSession' , self.fileName)
-        
-            for seat in seatPixelCoords:
-                self.recordCoord(seat[0], seat[1])
-        
-            self.enableActions()    
+            self.saveDirectory = dialog.selectedFiles()[0].replace('/', os.sep)
+
+            try:
+                self.pngPath, seatPixelCoords, self.magicScale = seatAllocationIO.loadSession(self.saveDirectory)
+                
+                ## Now the PNG and seat coord files have been loaded, set the pixmap and draw coords
+                self.updatePixmap(self.pngPath)
+                for seat in seatPixelCoords:
+                    self.recordCoord(seat[0], seat[1])
+
+                self.enableActions()    
+                
+            except:
+                print('Folder didn\'t contain what was expected')
         else:
             pass
 
-          
     def saveSession(self):
         self.setMode(0)
-        dialog = QtWidgets.QFileDialog()
-        dialog.setWindowTitle('Save Session Data to new Directory')
-        dialog.setDirectory(os.getcwd())
-        dialog.setFileMode(QtWidgets.QFileDialog.DirectoryOnly)
-        if dialog.exec_():
-            directory = dialog.selectedFiles()[0].replace('/', os.sep)
-            ## automatically comes with directory seperators as forward slashes.
-            seatAllocationIO.saveSession(directory, self.fileName, self.Xs, self.Ys)
-        else:
-            pass
-        
+        seatAllocationIO.saveSession(self.saveDirectory, self.Xs, self.Ys)
+
     
  
 app = None
