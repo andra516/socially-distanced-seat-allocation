@@ -6,14 +6,15 @@ Created on Wed Jun 30 21:26:28 2021
 """
 import numpy as np
 
-def jonsAllocator(points):
+def jonsAllocator(points, scale):
     ''' 
     Jon's seat allocation algorithm.
     
     Inputs: 
         points: numpy ndarray containing pixel coordinates of all seats selected.
                 columns are X or Y coordinate, rows are different seats
-        ***scale: yet to be implemented
+        scale: float indicating the pixel -> real life metre conversion. scale has
+                units of pixels per real life metre.
         
     Outputs:
         fpoints: numpy ndarray containing pixel coordinates of optimal seat
@@ -21,8 +22,11 @@ def jonsAllocator(points):
     '''
 
     N = len(points)
-    metres = 78.4
-    rcut = metres*1.5  # 76 pixels per 1m
+    
+    socialDistancingSeperation = 2 # measured in metres
+    rcut = socialDistancingSeperation * scale
+#    metres = 78.4
+#    rcut = metres*1.5  # 76 pixels per 1m
     
     overlap = True
     cpoints = list(points)
@@ -61,7 +65,21 @@ def jonsAllocator(points):
     return fpoints
 
 def main():
-    pass
+    points = np.loadtxt(r'C:\Users\henry\Documents\Seat Allocation Project Sum 2021\Seat Allocation Project\GUI\Seat Allocation Save Data.txt')
+#    print(points)
+    
+    ppi = 300
+    pdfScale = '1:100'
+    scaleVals = pdfScale.split(sep=':')
+    
+    SCALE = int(scaleVals[0])/int(scaleVals[1]) * ppi * 100/2.54000508 # in pixels per real life metre
+    print(SCALE)
+    jonsAllocator(points, SCALE)
+    
+    
+    
+    
+    
     
 if __name__ == '__main__':
     main()
