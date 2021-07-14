@@ -168,6 +168,7 @@ class OpenNewSession(QtWidgets.QWidget):
             ## read off whats in the lineEdits
             self.ppi = int(self.pngResolutionLineEdit.text())
             self.pdfScale = self.planScaleLineEdit.text().split(sep=':')
+            self.pdfPath = self.pdfPathLineEdit.text()
             
             ## convert the pdf to a png at the desired ppi and save to saveDirectory
             image = convert_from_path(self.pdfPath, self.ppi)[0]
@@ -189,6 +190,7 @@ class OpenNewSession(QtWidgets.QWidget):
         self.parent.magicScale = int(self.pdfScale[0])/int(self.pdfScale[1]) * self.ppi * 100 / 2.54000508
         self.parent.updatePixmap(self.parent.pngPath)
         self.parent.enableActions()
+        print(self.parent.magicScale)
         
         savePlanDetails(self.parent.saveDirectory, self.ppi, self.pdfScale, self.parent.magicScale)
         print(r'saved plan details :)')

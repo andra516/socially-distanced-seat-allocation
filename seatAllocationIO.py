@@ -124,16 +124,18 @@ def loadSession(directory):
     return (PNGFilePath, seatPixelCoords, magicScale)
 
 
-
-
-if __name__ == '__main__':
-    directory = r'C:\Users\henry\Documents\Seat Allocation Project Sum 2021\Seat Allocation Project\GUI\Seat Allocation Session Save Data'
+def main():
+    directory = r'C:\Users\henry\Documents\Seat Allocation Project Sum 2021\Seat Allocation Project\GUI\Seat Allocation Session Save Data\Seat Allocation Session #1 - Bramall Ground Floor'
 #    emptyFolder = r'C:\Users\henry\Documents\Seat Allocation Project Sum 2021\Seat Allocation Project\GUI\Seat Allocation Session Save Data\New Folder'
 
 #    PNGFilePath = r'C:\Users\henry\Documents\Seat Allocation Project Sum 2021\Seat Allocation Project\GUI\Seat Allocation Session Save Data\Full Seat Selection for Aston Webb Lower GFloor\Aston Webb C Block - Lower Ground Floor Plan.png'
-    Xs = [10, 20, 30, 40, 50]
-    Ys = [5, 10, 15, 20, 25]
+#    Xs = [10, 20, 30, 40, 50]
+#    Ys = [5, 10, 15, 20, 25]
     
+    PNGFilePath, seatPixelCoords, magicScale = loadSession(directory)
     
-    d = saveSession(directory, Xs, Ys)
+#    d = saveSession(directory, Xs, Ys)
     
+
+if __name__ == '__main__':
+    main()
