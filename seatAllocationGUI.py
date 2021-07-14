@@ -12,7 +12,7 @@ import sys
 import os
 #import time
 import numpy as np
-from seatAllocationAlgorithmJon import jonsAllocator
+from seatAllocationAlgorithms import jonsAllocator, richardsAllocator
 from seatAllocationNewSessionHandler import OpenNewSession
 import seatAllocationIO
 
@@ -128,7 +128,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         
         
         ### FILE MENU BAR ACTIONS
-        self.openAct = QtWidgets.QAction('Start new allocation session')
+        self.newSessionAct = QtWidgets.QAction('Start new allocation session')
         self.loadSessionAct = QtWidgets.QAction('Load in previous allocation session') # pixel coordinates from previously found maps
         self.saveAct = QtWidgets.QAction('Save current seat allocation session')
         
@@ -136,13 +136,15 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.loadSessionAct.setEnabled(True)
         self.saveAct.setEnabled(False)
     
-        self.openAct.triggered.connect(self.startNewSession)
+        self.newSessionAct.triggered.connect(self.startNewSession)
         self.loadSessionAct.triggered.connect(self.loadSession)
         self.saveAct.triggered.connect(self.saveSession)
         
-        self.openAct.setShortcut(QKeySequence('Ctrl+O'))
+        self.newSessionAct.setShortcut(QKeySequence('Ctrl+N'))
+        self.loadSessionAct.setShortcut(QKeySequence('Ctrl+O'))
+        self.saveAct.setShortcut(QKeySequence('Ctrl+S'))
                 
-        self.fileMenu.addAction(self.openAct)
+        self.fileMenu.addAction(self.newSessionAct)
         self.fileMenu.addAction(self.loadSessionAct)
         self.fileMenu.addAction(self.saveAct)
     
@@ -228,9 +230,13 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.scene.addPixmap(self.initPixmap)
         self.view.fitInView(QRectF(self.initPixmap.rect()), mode=Qt.KeepAspectRatio)
         
-        ## initialise brushes:
+        ## initialise pens and brushes:
         self.opaqueHighlightBrush = QBrush(QColor(238,38,34,255))
         self.transparentHighlightBrush = QBrush(QColor(238,38,34,0))
+        self.seatPen = QPen(QColor('#1d59af'))
+        self.seatPen.setWidth(3)
+        self.socialDistancePen = QPen(QColor('#ee2622'))
+        self.socialDistancePen.setWidth(3)
         
         self.mode = 0
         self.moveHighlightIndex = None # varibale that holds index of item currently highlighted for moving
@@ -247,7 +253,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         '''
         self.Xs = []
         self.Ys = []
-        self.currentGraphicsEllipseItems = []
+        self.currentSeatGraphicsItems = []
 #        self.scene.clear()
         self.setMode(0)
         self.saveAct.setEnabled(False)
@@ -368,7 +374,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         
     def undoSelection(self):
         try:
-            itemToRemove = self.currentGraphicsEllipseItems.pop()
+            itemToRemove = self.currentSeatGraphicsItems.pop()
             self.scene.removeItem(itemToRemove)
         except IndexError:
             pass
@@ -393,17 +399,17 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.Ys.append(y)       
         self.circleDiameter = 10 # plots from top left of circle, so adjustments made to plot centre from mouse tip
         ellipse = QtWidgets.QGraphicsEllipseItem(x-self.circleDiameter/2, y-self.circleDiameter/2, self.circleDiameter, self.circleDiameter)
-        ellipse.setPen(QPen(QColor('#1d59af')))
+        ellipse.setPen(self.seatPen)
         ellipse.setBrush(self.transparentHighlightBrush)        
         
         self.scene.addItem(ellipse)
-        self.currentGraphicsEllipseItems.append(ellipse)
+        self.currentSeatGraphicsItems.append(ellipse)
         if len(self.Xs) > 0:
             self.saveAct.setEnabled(True)
         
     @pyqtSlot(int)
     def setMoveHighlight(self, index):
-        highlightedGraphicsEllipseItem = self.currentGraphicsEllipseItems[index]
+        highlightedGraphicsEllipseItem = self.currentSeatGraphicsItems[index]
 
 #        if self.moveHighlightIndex is None:
             # if no seat is currently highlighted
@@ -421,29 +427,86 @@ class MyMainWindow(QtWidgets.QMainWindow):
 
     def doneAndRun(self):
         self.setMode(0)
-        self.seatPixelCoords = np.zeros((len(self.currentGraphicsEllipseItems), 2))
+        self.seatPixelCoords = np.zeros((len(self.currentSeatGraphicsItems), 2))
         self.seatPixelCoords[:,0] = self.Xs
         self.seatPixelCoords[:,1] = self.Ys
         
         # replace this with saveSession eventually
         self.saveSession()
         
-        self.selectedSeatCoords = jonsAllocator(self.seatPixelCoords, self.magicScale)
+#        self.selectedSeatCoords = jonsAllocator(self.seatPixelCoords, self.magicScale)
         
-        self.plotSocialDistancingCircles()
+        self.socialDistancingSeperation = 2
+        margin = 0.15
+        n1 = 50
+        n2 = 100
+        totalReRuns = 100       
         
-    def plotSocialDistancingCircles(self):
-        socialCircleDiameter = 2 * self.magicScale
+        self.seatsAllocatedBest, self.positionsBest = richardsAllocator(self.seatPixelCoords, self.socialDistancingSeperation, margin=margin, 
+                                                              magicScale=self.magicScale, stageOneLoops=n1, stageTwoLoops=n2,
+                                                              totalReRuns=totalReRuns)
         
-        for i in range(self.selectedSeatCoords.shape[0]):
-            x = self.selectedSeatCoords[i,0]
-            y = self.selectedSeatCoords[i, 1]
-            self.scene.addEllipse(x-socialCircleDiameter/2, y-socialCircleDiameter/2, socialCircleDiameter, socialCircleDiameter, pen=QPen(QColor('red')))
-        pass
+        print(f'Number of Seats Allocated: {len(self.seatsAllocatedBest)} out of {self.positionsBest.shape[0]}')
+        self.plotSocialDistancingCircles('r')
+        
+    def plotSocialDistancingCircles(self, allocationAlgorithm):
+        '''
+        Plots the social distancing circles on the GraphicsScene
+        Inputs:
+        --------------
+        > allocationAlgorithm: 'j' or 'r' depending on algorithm used - changes way things are plotted.
+        '''
+        self.socialCircleDiameter = self.socialDistancingSeperation * self.magicScale
+        
+        if allocationAlgorithm == 'j':
+            for i in range(self.selectedSeatCoords.shape[0]):
+                x = self.selectedSeatCoords[i,0]
+                y = self.selectedSeatCoords[i, 1]
+                self.scene.addEllipse(x-self.socialCircleDiameter/2, y-self.socialCircleDiameter/2, self.socialCircleDiameter, self.socialCircleDiameter, pen=self.socialDistancePen)
+                self.scene.addEllipse(x-self.circleDiameter/2, y-self.circleDiameter/2, self.circleDiameter, self.circleDiameter, brush=self.opaqueHighlightBrush, pen=self.seatPen)
+        
+        elif allocationAlgorithm == 'r':
+
+            self.allocatedPositions = np.take(self.positionsBest, self.seatsAllocatedBest, axis=0)
+            
+            
+            
+            
+            
+            for seatidx, positions in zip(self.seatsAllocatedBest, self.allocatedPositions):
+                ### remove seat graphics item from scene
+                itemToRemove = self.currentSeatGraphicsItems[int(seatidx)]
+                self.scene.removeItem(itemToRemove)
+                x = positions[0]
+                y = positions[1]
+                ## creat new seat ellipse item, add to scene and replace in currentSeatGraphicsItem
+                ellipse = QtWidgets.QGraphicsEllipseItem(x-self.circleDiameter/2, y-self.circleDiameter/2, self.circleDiameter, self.circleDiameter)
+                ellipse.setPen(self.seatPen)
+                ellipse.setBrush(self.transparentHighlightBrush)        
+        
+                self.scene.addItem(ellipse)
+                self.currentSeatGraphicsItems[int(seatidx)] = ellipse
+                ## plot social circles
+                self.scene.addEllipse(x-self.socialCircleDiameter/2, y-self.socialCircleDiameter/2, self.socialCircleDiameter, self.socialCircleDiameter, pen=self.socialDistancePen)
+                self.scene.addEllipse(x-self.circleDiameter/2, y-self.circleDiameter/2, self.circleDiameter, self.circleDiameter, brush=self.opaqueHighlightBrush, pen=self.seatPen)
+            
+        self.checkValid(self.allocatedPositions)
+        
+    def checkValid(self, allocatedPositions):
+        
+        
+        for seat1idx, pos1 in enumerate(allocatedPositions):
+            for seat2idx, pos2 in enumerate(allocatedPositions):
+                if seat1idx == seat2idx:
+                    continue
+                dist = np.linalg.norm(pos1-pos2)
+                if dist < self.socialDistancingSeperation*self.magicScale:
+                    print(f'seats {seat1idx} and {seat2idx} are less than {self.socialDistancingSeperation}, sep: {dist/self.magicScale} m')
+        
+        
+            
     
     def loadSession(self):
-        
-        
         ### when loading in a previous file, need the magic scale pre-calculated - needs to go into json file
         ### need to work out how to save and read from json files
         
@@ -456,7 +519,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
 
             try:
                 self.pngPath, seatPixelCoords, self.magicScale = seatAllocationIO.loadSession(self.saveDirectory)
-                
+                print(seatPixelCoords, self.pngPath, self.magicScale)
                 ## Now the PNG and seat coord files have been loaded, set the pixmap and draw coords
                 self.updatePixmap(self.pngPath)
                 for seat in seatPixelCoords:
@@ -464,7 +527,9 @@ class MyMainWindow(QtWidgets.QMainWindow):
 
                 self.enableActions()    
                 
-            except:
+            except Exception as e:
+                print(e.__class__.__name__)
+                print(e)
                 print('Folder didn\'t contain what was expected')
         else:
             pass
