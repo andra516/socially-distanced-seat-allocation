@@ -9,7 +9,7 @@ import numpy as np
 import os
 import sys
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt, QRunnable, QThreadPool, pyqtSlot, QObject, QThread
+from PyQt5.QtCore import Qt, QRunnable, QThreadPool, pyqtSignal, pyqtSlot, QObject, QThread
 from PyPDF2 import PdfFileReader
 from pdf2image import convert_from_path
 from seatAllocationIO import savePlanDetails
@@ -21,43 +21,39 @@ import shutil
 class DummyParent():
     
     def __init__(self):
-        pass
+        self.threadpool = QThreadPool()
+        
 
     def updatePixmap(self, pngPath):
         pass
     
-    def enableActions(self):
+    def enableActions(self, mode):
         pass     
         
 
 
 class WorkerSignals(QObject):
     
-    pass
+    finishedSignal = pyqtSignal()
 
-class Worker(QThread):
+class Worker(QRunnable):
     
-    def __init__(self, pdfPath, ppi, saveDirectory):
+    def __init__(self, parent, pdfPath, ppi, pngPath):
         super().__init__()
+        self.parentWidget = parent
         self.pdfPath = pdfPath
         self.ppi = ppi
-        self.saveDirectory = saveDirectory
+        self.pngPath = pngPath
+        self.workerSignals = WorkerSignals()
         
     @pyqtSlot()
     def run(self):
-#        print('starting conversion')
-        ### print out the PDF dimensions
-#        pg = PdfFileReader(open(self.pdfPath, 'rb'))
-#        pgMediaBox = pg.getPage(0).mediaBox
-#        dims = np.array([pgMediaBox.getHeight(), pgMediaBox.getWidth()]) # returns in points, 1pt = 1/72 inches
-#        dims = dims/72
-#        print(f'PDF dimensions: {dims} inches')
-#        
-        ### creat .png version of pdf
+        print('starting conversion')
         image = convert_from_path(self.pdfPath, self.ppi)[0]
-        pngPath = self.saveDirectory + os.sep + os.path.splitext(os.path.basename(self.pdfPath))[0] + '.png'
+        image.save(self.pngPath, 'PNG')
+        print('finished conversion and saved')
         
-        image.save(pngPath, 'PNG')
+        self.workerSignals.finishedSignal.emit()
 
 class OpenNewSession(QtWidgets.QWidget):
     
@@ -112,7 +108,6 @@ class OpenNewSession(QtWidgets.QWidget):
         
         self.setLayout(self.mainLayout)
         
-        self.newDirectoryCreated = False
         self.ppi = 300
     
         
@@ -122,7 +117,7 @@ class OpenNewSession(QtWidgets.QWidget):
         if self.pdfPath == '':
             pass
         else:
-            print(self.pdfPath)
+#            print(self.pdfPath)
             self.pdfPathLineEdit.setText(self.pdfPath) 
             self.newDirectoryButton.setEnabled(True)
             
@@ -131,70 +126,83 @@ class OpenNewSession(QtWidgets.QWidget):
         dialog.setWindowTitle('Select Session Save Location')
         dialog.setDirectory(os.getcwd())
         dialog.setFileMode(QtWidgets.QFileDialog.DirectoryOnly)
+        
         if dialog.exec_():
-            directory = dialog.selectedFiles()[0].replace('/', os.sep)
+            self.sessionSavePath = dialog.selectedFiles()[0].replace('/', os.sep)            
             
             sessionNum = 1
-            while True:
-                try:
-                    self.parent.saveDirectory = directory + os.sep + 'Seat Allocation Session #' + str(sessionNum) + ' - ' + os.path.splitext(os.path.basename(self.pdfPath))[0]
-#                    print(saveDirectory)
-                    os.mkdir(self.parent.saveDirectory)
-                    break
-                except FileExistsError:
-                    sessionNum += 1
-                    continue
-            pdfCopyPath = self.parent.saveDirectory + os.sep + os.path.basename(self.pdfPath)
-            shutil.copy(self.pdfPath, pdfCopyPath)
-            self.newDirectoryCreated = True
             
-            self.newDirectoryLineEdit.setText(self.parent.saveDirectory)
+            while True:
+                saveDirectory = self.sessionSavePath + os.sep + 'Seat Allocation Session #' + str(sessionNum) + ' - ' + os.path.splitext(os.path.basename(self.pdfPath))[0]
+                if os.path.basename(saveDirectory) in os.listdir(self.sessionSavePath):
+                    sessionNum += 1
+                else:
+                    self.parent.saveDirectory = saveDirectory
+                    break
+             
+            self.newDirectoryLineEdit.setText(self.parent.saveDirectory)       
+
             self.doneButton.setEnabled(True)
         else:
             pass
         
 
     def convertPDF(self):
-#        if (self.pdfPath is not None) and type(self.ppi) == int and self.newDirectoryCreated:
-#        threadpool = QThreadPool()
-#        converterWorker = ConverterWorker(self.pdfPath, self.ppi, self.saveDirectory)
-#        self.statusBarLabel.setText('started converting pdf to png')
-#        threadpool.start(converterWorker)
-#        worker = Worker(self.pdfPath, self.ppi, self.saveDirectory)
-#        print('worker made')
-#        worker.start()
+        ## disable buttons and LineEdits
+        self.browsePDFButton.setEnabled(False)
+        self.newDirectoryButton.setEnabled(False)
+        self.doneButton.setEnabled(False)
+        self.pdfPathLineEdit.setEnabled(False)
+        self.pngResolutionLineEdit.setEnabled(False)
+        self.planScaleLineEdit.setEnabled(False)
+        self.newDirectoryLineEdit.setEnabled(False)
         
+        
+        ## read off whats in the lineEdits
+        self.ppi = int(self.pngResolutionLineEdit.text())
+        self.pdfScale = self.planScaleLineEdit.text().split(sep=':')
+        self.pdfPath = self.pdfPathLineEdit.text()
+
+        ### Create session save directory
         try:
-            ## read off whats in the lineEdits
-            self.ppi = int(self.pngResolutionLineEdit.text())
-            self.pdfScale = self.planScaleLineEdit.text().split(sep=':')
-            self.pdfPath = self.pdfPathLineEdit.text()
-            
-            ## convert the pdf to a png at the desired ppi and save to saveDirectory
-            image = convert_from_path(self.pdfPath, self.ppi)[0]
-            self.parent.pngPath = self.parent.saveDirectory + os.sep + os.path.splitext(os.path.basename(self.pdfPath))[0] + '.png'
-            image.save(self.parent.pngPath, 'PNG')
-            
-            ## save JSON file of ppi and pdfScale
-            
-            
-            ## close the window and call parent functions/set variables          
-            self.close()
-        
+            os.mkdir(self.parent.saveDirectory)
+            ## copy pdf room plan to session save directory
+            pdfCopyPath = self.parent.saveDirectory + os.sep + os.path.basename(self.pdfPath)
+            shutil.copy(self.pdfPath, pdfCopyPath)
         except Exception as e:
-            print(e.__name__)
+            print(e.__class__.__name__)
             print(e)
-            pass
+            
+
+        self.parent.pngPath = self.parent.saveDirectory + os.sep + os.path.splitext(os.path.basename(self.pdfPath))[0] + '.png'
+            
+        self.worker = Worker(self, self.pdfPath, self.ppi, self.parent.pngPath)
+        self.worker.workerSignals.finishedSignal.connect(self.close)
+        self.parent.threadpool.start(self.worker)
+
+#        self.close()
+            
         
+#            # convert the pdf to a png at the desired ppi and save to saveDirectory
+#        try:
+#            image = convert_from_path(self.pdfPath, self.ppi)[0]
+#            self.parent.pngPath = self.parent.saveDirectory + os.sep + os.path.splitext(os.path.basename(self.pdfPath))[0] + '.png'
+#            image.save(self.parent.pngPath, 'PNG')
+#
+#            ## close the window and call parent functions/set variables          
+#            self.close()
+#        except Exception as e:
+#            print(e.__name__)
+#            print(e)
+#            pass
+#        
     def close(self):
         self.parent.magicScale = int(self.pdfScale[0])/int(self.pdfScale[1]) * self.ppi * 100 / 2.54000508
         self.parent.updatePixmap(self.parent.pngPath)
-        self.parent.enableActions()
-        print(self.parent.magicScale)
+        self.parent.enableActions(1)
         
         savePlanDetails(self.parent.saveDirectory, self.ppi, self.pdfScale, self.parent.magicScale)
-        print(r'saved plan details :)')
-        
+#        print(r'saved plan details :)')
         
         self.hide()
 
