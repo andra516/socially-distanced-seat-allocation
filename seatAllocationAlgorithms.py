@@ -64,7 +64,7 @@ def jonsAllocator(points, scale):
 
 
 def richardsAllocator(seatPixelCoords, socialDistancingSeperation=2, margin=0.1, 
-                      magicScale=(300/2.54000508), stageOneLoops=50, stageTwoLoops=200, 
+                      magicScale=(300/2.54000508), stageOneLoops=50, stageTwoLoops=100, 
                       totalReRuns=150):
     '''
     Translation of Richard's SeatAllocation.m Allocator MATLAB function for seat allocation.
