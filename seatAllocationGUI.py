@@ -14,6 +14,7 @@ import os
 import numpy as np
 from seatAllocationAlgorithms import jonsAllocator, richardsAllocator
 from seatAllocationNewSessionHandler import OpenNewSession
+from seatAllocationRunHandler import doneAndRunHandler
 import seatAllocationIO
 
 
@@ -473,8 +474,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
                         
 #        else:
 #            pass
-                                                     
-
+                                                    
     def doneAndRun(self):
         self.setMode(0)
         self.seatPixelCoords = np.zeros((len(self.currentSeatGraphicsItems), 2))
@@ -487,11 +487,19 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.enableActions(0)
         self.newSessionAct.setEnabled(False)
         self.saveAct.setEnabled(False)
+        self.zoomInAct.setEnabled(True)
+        self.zoomOutAct.setEnabled(True)
         
-        self.socialDistancingSeperation = 2
+        self.doneAndRunWindow = doneAndRunHandler(parent=self)
+        self.doneAndRunWindow.show()
         
-        algorithmWorker = AlgorithmWorker(self, self.seatPixelCoords, self.magicScale)
-        self.threadpool.start(algorithmWorker)
+        
+#        
+#        
+#        self.socialDistancingSeperation = 2
+#        
+#        algorithmWorker = AlgorithmWorker(self, self.seatPixelCoords, self.magicScale)
+#        self.threadpool.start(algorithmWorker)
         
 #        print(f'Number of Seats Allocated: {len(self.seatsAllocatedBest)} out of {self.positionsBest.shape[0]}')
 #        self.plotSocialDistancingCircles('r')
@@ -504,7 +512,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         --------------
         > allocationAlgorithm: 'j' or 'r' depending on algorithm used - changes way things are plotted.
         '''
-        self.enableActions(1)
+        self.enableActions(mode=1)
         self.newSessionAct.setEnabled(True)
         self.saveAct.setEnabled(True)
         
