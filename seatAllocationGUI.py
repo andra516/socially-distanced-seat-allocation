@@ -6,7 +6,7 @@ Created on Mon Jun 28 16:17:23 2021
 @author: henry
 """
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt, QRect, QRectF, QObject, pyqtSignal, pyqtSlot
+from PyQt5.QtCore import Qt, QRect, QRectF, QObject, pyqtSignal, pyqtSlot, QThreadPool, QRunnable
 from PyQt5.QtGui import QPixmap, QBitmap, QIcon, QPen, QBrush, QColor, QKeySequence, QCursor
 import sys
 import os
@@ -21,6 +21,38 @@ class Communication(QObject):
     
     ginputClickSignal = pyqtSignal(float, float) # will be used to tell MainWindow where seat positions are.
     moveClickSignal = pyqtSignal(int)
+    finishedAllocationSignal = pyqtSignal(str)
+    
+    
+class AlgorithmWorker(QRunnable):
+    
+    def __init__(self, parent, seatPixelCoords, magicScale):
+        super().__init__()
+        self.parent = parent
+        self.seatPixelCoords = seatPixelCoords
+        self.magicScale = magicScale
+        
+        self.communicator = Communication()
+        self.communicator.finishedAllocationSignal.connect(self.parent.plotSocialDistancingCircles)
+    
+    @pyqtSlot()
+    def run(self):
+        self.socialDistancingSeperation = self.parent.socialDistancingSeperation
+        margin = 0.15
+        n1 = 50
+        n2 = 100
+        totalReRuns = 100 
+        
+#        self.selectedSeatCoords = jonsAllocator(self.seatPixelCoords, self.magicScale)
+        
+        self.parent.seatsAllocatedBest, self.parent.positionsBest = richardsAllocator(self.seatPixelCoords, self.socialDistancingSeperation, margin=margin, 
+                                                              magicScale=self.magicScale, stageOneLoops=n1, stageTwoLoops=n2,
+                                                              totalReRuns=totalReRuns)
+        
+        print(f'Number of Seats Allocated: {len(self.parent.seatsAllocatedBest)} out of {self.parent.positionsBest.shape[0]}')
+        
+        self.communicator.finishedAllocationSignal.emit('r')
+        
 
 class MyGraphicsView(QtWidgets.QGraphicsView):
     
@@ -241,6 +273,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.mode = 0
         self.moveHighlightIndex = None # varibale that holds index of item currently highlighted for moving
         
+        self.threadpool = QThreadPool()
         
 #        self.quickSetup() ## purely for testing to speed up process of opening file
         
@@ -259,22 +292,39 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.saveAct.setEnabled(False)
         
         
-    def enableActions(self):
-        self.loadSessionAct.setEnabled(True)
-#        self.saveAct.setEnabled(True)
-        # ginput actions
-        self.selectSeatsAct.setEnabled(True)
-        self.undoSelectAct.setEnabled(True)
-#        self.movePointAct.setEnabled(True)
-        self.clearAllAct.setEnabled(True)
-        self.doneAndRunAct.setEnabled(True)
-        # toolbar actions
-        self.ginputAct.setEnabled(True)
-        self.zoomInAct.setEnabled(True)
-        self.zoomOutAct.setEnabled(True)
-        self.ginputAct.setEnabled(True)
-        self.scaleAct.setEnabled(True)
-        self.doneAct.setEnabled(True)
+    def enableActions(self, mode):
+        if mode == 1:
+            self.loadSessionAct.setEnabled(True)
+    #        self.saveAct.setEnabled(True)
+            # ginput actions
+            self.selectSeatsAct.setEnabled(True)
+            self.undoSelectAct.setEnabled(True)
+    #        self.movePointAct.setEnabled(True)
+            self.clearAllAct.setEnabled(True)
+            self.doneAndRunAct.setEnabled(True)
+            # toolbar actions
+            self.ginputAct.setEnabled(True)
+            self.zoomInAct.setEnabled(True)
+            self.zoomOutAct.setEnabled(True)
+            self.ginputAct.setEnabled(True)
+            self.scaleAct.setEnabled(True)
+            self.doneAct.setEnabled(True)
+        elif mode == 0:
+            self.loadSessionAct.setEnabled(False)
+    #        self.saveAct.setEnabled(False)
+            # ginput actions
+            self.selectSeatsAct.setEnabled(False)
+            self.undoSelectAct.setEnabled(False)
+    #        self.movePointAct.setEnabled(False)
+            self.clearAllAct.setEnabled(False)
+            self.doneAndRunAct.setEnabled(False)
+            # toolbar actions
+            self.ginputAct.setEnabled(False)
+            self.zoomInAct.setEnabled(False)
+            self.zoomOutAct.setEnabled(False)
+            self.ginputAct.setEnabled(False)
+            self.scaleAct.setEnabled(False)
+            self.doneAct.setEnabled(False)
     
     def quickSetup(self):
         '''
@@ -282,7 +332,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         can be customised.
         '''
         
-        self.enableActions()
+        self.enableActions(mode=1)
 
         self.pngPath = os.getcwd() + '\\Room Plans\\Aston Webb C Block - Lower Ground Floor Plan.png'
 #        print(self.pngPath)
@@ -293,7 +343,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.newSessionWindow = OpenNewSession(self)
         
         self.newSessionWindow.show()
-        ## updatePixmap() and enableActions() called and self.pngPath assigned in seatAllocationPDFHandler when convertPDF() is called.
+        ## updatePixmap() and enableActions() called and self.pngPath assigned in seatAllocationNewSessionHandler when convertPDF() is called.
 
             
     def updatePixmap(self, pngPath):
@@ -434,21 +484,19 @@ class MyMainWindow(QtWidgets.QMainWindow):
         # replace this with saveSession eventually
         self.saveSession()
         
-#        self.selectedSeatCoords = jonsAllocator(self.seatPixelCoords, self.magicScale)
+        self.enableActions(0)
+        self.newSessionAct.setEnabled(False)
+        self.saveAct.setEnabled(False)
         
         self.socialDistancingSeperation = 2
-        margin = 0.15
-        n1 = 50
-        n2 = 100
-        totalReRuns = 100       
         
-        self.seatsAllocatedBest, self.positionsBest = richardsAllocator(self.seatPixelCoords, self.socialDistancingSeperation, margin=margin, 
-                                                              magicScale=self.magicScale, stageOneLoops=n1, stageTwoLoops=n2,
-                                                              totalReRuns=totalReRuns)
+        algorithmWorker = AlgorithmWorker(self, self.seatPixelCoords, self.magicScale)
+        self.threadpool.start(algorithmWorker)
         
-        print(f'Number of Seats Allocated: {len(self.seatsAllocatedBest)} out of {self.positionsBest.shape[0]}')
-        self.plotSocialDistancingCircles('r')
+#        print(f'Number of Seats Allocated: {len(self.seatsAllocatedBest)} out of {self.positionsBest.shape[0]}')
+#        self.plotSocialDistancingCircles('r')
         
+    @pyqtSlot(str)
     def plotSocialDistancingCircles(self, allocationAlgorithm):
         '''
         Plots the social distancing circles on the GraphicsScene
@@ -456,6 +504,10 @@ class MyMainWindow(QtWidgets.QMainWindow):
         --------------
         > allocationAlgorithm: 'j' or 'r' depending on algorithm used - changes way things are plotted.
         '''
+        self.enableActions(1)
+        self.newSessionAct.setEnabled(True)
+        self.saveAct.setEnabled(True)
+        
         self.socialCircleDiameter = self.socialDistancingSeperation * self.magicScale
         
         if allocationAlgorithm == 'j':
@@ -468,10 +520,6 @@ class MyMainWindow(QtWidgets.QMainWindow):
         elif allocationAlgorithm == 'r':
 
             self.allocatedPositions = np.take(self.positionsBest, self.seatsAllocatedBest, axis=0)
-            
-            
-            
-            
             
             for seatidx, positions in zip(self.seatsAllocatedBest, self.allocatedPositions):
                 ### remove seat graphics item from scene
@@ -493,7 +541,6 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.checkValid(self.allocatedPositions)
         
     def checkValid(self, allocatedPositions):
-        
         
         for seat1idx, pos1 in enumerate(allocatedPositions):
             for seat2idx, pos2 in enumerate(allocatedPositions):
@@ -525,7 +572,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
                 for seat in seatPixelCoords:
                     self.recordCoord(seat[0], seat[1])
 
-                self.enableActions()    
+                self.enableActions(mode=1)    
                 
             except Exception as e:
                 print(e.__class__.__name__)
