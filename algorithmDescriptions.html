@@ -1,0 +1,12 @@
+<html> 
+	This software currently offers two seat allocation algorithms for finding seating solutions: 
+	<p>
+		<b>Allocation by Addition:</b> Iteratively searches a room by firstly: randomly adjusting the seat pixel locations (in an attempt to remove the human error associated with manual seat selection and mouse clciking) and then repeatedly 'seeding' a room with seats which are 2m+ away from all others placed.
+	</p>  
+	<p>
+		<b>Allocation by Elimination:</b> Searches for a valid seating solution by assigning social-distancing circles to every selected seat. After calculating the distances between all seats, the routine randomly removes the seats with the greatest number of overlaps. A solution is reached when the remaining seats have no mutual overlaps with one another.
+	</p>
+	<p>
+		I hope that this software will make writing, testing and implementing your own allocation algorithms easier and help us all get back to in-person teaching!
+	</p>
+</html>
