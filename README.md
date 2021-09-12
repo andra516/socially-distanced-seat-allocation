@@ -4,7 +4,7 @@
 
 This is the repository for my social-distancing seat allocation project for creating optimal seating plans in lecture halls and theatres whilst maintaining social distancing.
 
-<img src="/images and icons/gui demo.gif" alt="gif demoing the GUI" style="height:898px; width:1681px;"/>
+<img src="/images and icons/gui demo short.gif" alt="gif demoing the GUI" style="height:898px; width:1681px;"/>
 
 The project contains code for a GUI (demonstrated above) that takes a PDF of an architectural plan, converts it to image format and displays it to the window. The user can then zoom and pan across the image, marking the location of all seat locations within the hall before running an integrated seat allocation algorithm which aims to maximise the number of seats allocated, subject to the constraint that the allocated seats must be seperated by 2m+. The UI then returns and visualises this seating arrangement, before entering 'post-allocation' mode, in which the user can manually add, remove or adjust the positions of allocated seats in the hall.
 
